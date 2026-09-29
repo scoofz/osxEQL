@@ -114,6 +114,10 @@ eqbuddy_launch() {
 # setting makes EQBuddy's windows non-activating, so clicking the widget doesn't pull
 # the game out of fullscreen. Edited only while EQBuddy is not running (it rewrites
 # settings.json on exit), and only in a profile it already created.
+# The knob is ALSO written here, before launch: winemac reads its options when the
+# driver initialises — before any of EQBuddy's own code runs — so the value EQBuddy
+# writes at startup only counts from its NEXT launch. Pre-writing it makes the very
+# launch that follows `osxeql overlay` float.
 eqbuddy_sync_float() {
     local mode="$1" log="$2" so f
     [ "$mode" = window ] || return 0
@@ -136,4 +140,7 @@ if s.get("WineFloatOverFullscreen") is not True:
     print("EQBuddy: WineFloatOverFullscreen enabled in", p)
 PY
     done
+    "$WINE" reg add 'HKCU\Software\Wine\AppDefaults\EQBuddy.exe\Mac Driver' \
+        /v LetTopmostWindowsFloatOverFullscreen /t REG_SZ /d Y /f >>"$log" 2>&1 \
+        || echo "EQBuddy: could not write the Mac Driver knob" >>"$log"
 }

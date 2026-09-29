@@ -45,7 +45,8 @@ with, endorsed by, or supported by Daybreak Game Company, CodeWeavers, or Apple.
 `engine/patches/winemac-overlay.patch` (applied to the Wine runtime by
 `engine/overlay.sh` and `engine/build-wine.sh`) comes from EQBuddy 1.99.18,
 `scripts/crossover/winemac-overlay.patch`; `engine/overlay.sh` follows that
-release's `scripts/crossover/setup-overlay.sh`.
+release's `scripts/crossover/setup-overlay.sh`, and `engine/tools/winlevels.m`
+(`osxeql winlevels`) is that release's `scripts/crossover/winlevels.m`.
 
 - Copyright (c) 2026 David Edwards.
 - License: MIT (https://github.com/DranakCorps-bot/EQBuddy/blob/v1.99.18/LICENSE).

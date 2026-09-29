@@ -27,6 +27,10 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
                                Rebuild winemac.so with the float-over-fullscreen
                                patch so EQBuddy (eqbuddy window) stays above the
                                FULLSCREEN game. Needs Xcode CLT + brew bison.
+  osxeql winlevels [filter] [--delay N]
+                               List on-screen windows with their macOS window
+                               LEVEL (diagnoses overlay z-order). --delay waits N s
+                               first so you can switch back to the game.
   osxeql status                Show what's installed
   osxeql doctor                Sanity-check the runtime
 
@@ -119,6 +123,23 @@ cmd_eqbuddy() {
     esac
 }
 
+cmd_winlevels() {
+    local bin="$OSXEQL_HOME/bin/winlevels" src="$HERE/tools/winlevels.m" filter="" delay=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --delay) delay="${2:-10}"; shift 2 ;;
+            *)       filter="$1"; shift ;;
+        esac
+    done
+    if [ ! -x "$bin" ] || [ "$src" -nt "$bin" ]; then
+        mkdir -p "$(dirname "$bin")"
+        xcrun clang -fobjc-arc -O2 -o "$bin" "$src" -framework Foundation -framework CoreGraphics \
+            || die "could not build winlevels (Xcode command-line tools needed: xcode-select --install)"
+    fi
+    [ "$delay" -gt 0 ] 2>/dev/null && { echo "capturing in ${delay}s — switch to the game now"; sleep "$delay"; }
+    "$bin" ${filter:+"$filter"}
+}
+
 cmd_doctor() {
     echo "== osxEQL doctor =="
     cmd_status
@@ -138,6 +159,7 @@ case "${1:-}" in
     res)           shift; cmd_res "$@" ;;
     eqbuddy)       shift; cmd_eqbuddy "$@" ;;
     overlay)       shift; bash "$HERE/overlay.sh" "$@" ;;
+    winlevels)     shift; cmd_winlevels "$@" ;;
     status)        cmd_status ;;
     doctor)        cmd_doctor ;;
     ""|-h|--help)  usage ;;
