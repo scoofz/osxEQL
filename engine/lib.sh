@@ -70,6 +70,47 @@ wine_env() {
     clean_stale_winetemp
 }
 
+# ---- game window size (gotcha #4) — same rules as the .app's launcher ------
+# The Wine virtual desktop AND all four eqclient.ini size keys must agree, or the
+# mouse only reaches part of the window. Precedence, resolved at every launch:
+#   1. OSXEQL_W/OSXEQL_H env vars (e.g. 1280x960 for a headless `patchme` check)
+#   2. $OSXEQL_HOME/resolution — "WxH" pin, "max" or "auto" (osxeql res)
+#   3. auto: current main display (points) minus 40x60 for menu + title bar
+resolve_size() {
+    local pin="" disp dw dh mode=auto
+    if [ -n "${OSXEQL_W:-}" ] && [ -n "${OSXEQL_H:-}" ]; then return 0; fi
+    [ -f "$OSXEQL_HOME/resolution" ] && pin="$(tr -cd '0-9xa-z' < "$OSXEQL_HOME/resolution")"
+    case "$pin" in
+        max) mode=max ;;
+        [0-9]*x[0-9]*) OSXEQL_W="${pin%%x*}"; OSXEQL_H="${pin##*x}"; return 0 ;;
+    esac
+    disp="$(osascript -l JavaScript -e 'ObjC.import("CoreGraphics"); const d=$.CGMainDisplayID(); $.CGDisplayPixelsWide(d)+"x"+$.CGDisplayPixelsHigh(d)' 2>/dev/null)"
+    dw="${disp%%x*}"; dh="${disp##*x}"
+    case "${dw}${dh}" in *[!0-9]*|"") dw=1920; dh=1080 ;; esac
+    if [ "$mode" = max ]; then OSXEQL_W="$dw"; OSXEQL_H="$dh"
+    else OSXEQL_W=$((dw - 40)); OSXEQL_H=$((dh - 60)); fi
+}
+
+# Pin eqclient.ini (CRLF, latin-1) to the virtual-desktop size: windowed AND
+# in-game-fullscreen keys, Fullscreen=0. Backup once to eqclient.ini.osxeql-bak.
+pin_eqclient() {
+    local ini="$EQ_UNIXDIR/eqclient.ini"
+    [ -f "$ini" ] || return 0
+    [ -f "$ini.osxeql-bak" ] || cp "$ini" "$ini.osxeql-bak"
+    /usr/bin/python3 - "$ini" "$1" "$2" <<'PY'
+import sys, re
+p, w, h = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(p, "rb").read().decode("latin-1")
+def setk(k, v, s):
+    pat = re.compile(r'(?im)^(\s*' + re.escape(k) + r'\s*=).*?(\r?)$')
+    return pat.sub(lambda m: m.group(1) + v + (m.group(2) or "\r"), s) if pat.search(s) else s
+for k, v in (("Fullscreen", "0"), ("Width", w), ("Height", h),
+             ("WindowedWidth", w), ("WindowedHeight", h)):
+    s = setk(k, v, s)
+open(p, "wb").write(s.encode("latin-1"))
+PY
+}
+
 have_wine()   { [ -x "$WINE" ]; }
 have_prefix() { [ -f "$WINEPREFIX/system.reg" ]; }
 have_eq()     { [ -f "$EQ_UNIXDIR/eqgame.exe" ]; }

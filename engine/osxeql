@@ -83,7 +83,7 @@ cmd_res() {
         [0-9]*x[0-9]*) echo "$1" > "$f"; echo "resolution: pinned to $1" ;;
         *)             die "usage: osxeql res [auto|max|WxH]" ;;
     esac
-    echo "takes effect next launch of the .app (osxeql play keeps its own 1280x960 verification default)"
+    echo "takes effect next launch (the .app and osxeql play; OSXEQL_W/OSXEQL_H env still override)"
 }
 
 cmd_eqbuddy() {
