@@ -391,6 +391,49 @@ install_flow(){
     fi
 }
 
+# ---- EQBuddy Evolved companion (optional; see Resources/eqbuddy.sh) --------
+# Asks ONCE (answer stored in $OSXEQL_HOME/eqbuddy), then starts EQBuddy with the
+# game on every PLAY launch. Nothing here may stop the game from launching: any
+# failure is logged, told to the user, and the launch continues.
+EQBUDDY_LIB="$RES/eqbuddy.sh"
+[ -f "$EQBUDDY_LIB" ] && . "$EQBUDDY_LIB"
+
+eqbuddy_offer(){
+    local choice setup eqlog="$OSXEQL_HOME/logs/eqbuddy-install.log"
+    choice=$(osa <<'OSA'
+set msg to "osxEQL can start EQBuddy Evolved — a companion widget that reads your EverQuest log (kills, DPS, loot, timers…) — together with the game." & return & return & "It is downloaded from its official GitHub release (DranakCorps-bot/EQBuddy), checked against its published SHA-256, and installed into the game's Wine prefix. EQBuddy is a separate product by its own author, not part of osxEQL." & return & return & "Change this any time with: osxeql eqbuddy desktop|window|off"
+set r to display dialog msg buttons {"No thanks", "Install EQBuddy"} default button "Install EQBuddy" with title "osxEQL — EQBuddy Evolved" with icon note
+return button returned of r
+OSA
+)
+    case "$choice" in
+        "Install EQBuddy") : ;;
+        "No thanks") eqbuddy_set_mode off; return 0 ;;
+        *) return 0 ;;   # dialog dismissed: ask again next launch
+    esac
+    osa -e 'display notification "Downloading EQBuddy Evolved…" with title "osxEQL"' &
+    if ! setup="$(eqbuddy_download "$OSXEQL_HOME/cache" 2>>"$eqlog")"; then
+        alert "EQBuddy could not be downloaded or failed its SHA-256 check (see logs/eqbuddy-install.log). The game will start without it; osxEQL will ask again next launch."
+        return 0
+    fi
+    eqbuddy_set_mode desktop
+    # Install in the background INSIDE the game's virtual desktop: the installer's
+    # own finish step starts EQBuddy, so it opens right there, next to the game.
+    "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" >>"$eqlog" 2>&1 &
+    osa -e 'display notification "Installing EQBuddy Evolved — it opens in the game window when ready." with title "osxEQL"' &
+    EQBUDDY_JUST_INSTALLED=1
+}
+
+start_eqbuddy(){
+    command -v eqbuddy_mode >/dev/null 2>&1 || return 0   # older bundle without the lib
+    EQBUDDY_JUST_INSTALLED=0
+    if [ "$(eqbuddy_mode)" = unset ]; then
+        eqbuddy_offer
+    fi
+    [ "$EQBUDDY_JUST_INSTALLED" = 1 ] && return 0
+    eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$OSXEQL_HOME/logs/eqbuddy.log"
+}
+
 # ---- go ---------------------------------------------------------------------
 if [ ! -f "$GAME_DIR/eqgame.exe" ]; then
     install_flow
@@ -406,5 +449,6 @@ else
     LP_WINPATH="$BOOT_WINPATH"
 fi
 cd "$GAME_DIR" 2>/dev/null || cd "$WINEPREFIX/drive_c"
+start_eqbuddy
 # LaunchPad in a wine virtual desktop (avoids its splash-window deadlock).
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" "$LP_WINPATH" >"$LOG" 2>&1

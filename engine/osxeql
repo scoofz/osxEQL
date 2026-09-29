@@ -1,7 +1,7 @@
 #!/bin/bash
 # osxEQL — open-source EverQuest Legends on macOS (Wine + DXMT, no CrossOver).
 # Headless engine CLI. The macOS app is a thin GUI over these same commands.
-HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"
 
 usage() {
 cat <<EOF
@@ -15,6 +15,12 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
   osxeql res [auto|max|WxH]    Game window size used by the .app (no arg: show).
                                auto = fit current main display (default),
                                max = exact display size, WxH = pin e.g. 3800x1550
+  osxeql eqbuddy [install|desktop|window|off]
+                               EQBuddy Evolved companion (no arg: show).
+                               install = fetch the official installer, verify its
+                               SHA-256, install into the prefix, enable (desktop).
+                               desktop = start it inside the game's window,
+                               window = as its own Mac window, off = never
   osxeql status                Show what's installed
   osxeql doctor                Sanity-check the runtime
 
@@ -60,6 +66,7 @@ cmd_status() {
     echo "prefix:  $(have_prefix && echo "$WINEPREFIX" || echo 'none')"
     echo "backend: $(cat "$OSXEQL_HOME/backend.active" 2>/dev/null || echo none)"
     echo "EQL:     $(have_eq && echo "installed ($EQ_UNIXDIR)" || echo 'not installed')"
+    echo "EQBuddy: $(eqbuddy_exe || echo 'not installed')  (mode: $(eqbuddy_mode))"
 }
 
 cmd_res() {
@@ -79,6 +86,32 @@ cmd_res() {
     echo "takes effect next launch of the .app (osxeql play keeps its own 1280x960 verification default)"
 }
 
+cmd_eqbuddy() {
+    local exe setup
+    case "${1:-}" in
+        "")
+            exe="$(eqbuddy_exe)" || exe="not installed"
+            echo "EQBuddy: $exe"
+            echo "mode:    $(eqbuddy_mode)   (desktop|window|off; unset = the app asks once)"
+            ;;
+        install)
+            have_wine   || die "wine not staged"
+            have_prefix || die "no prefix — run: osxeql setup"
+            wine_env
+            log "downloading EQBuddy Evolved from $EQBUDDY_RELEASE_URL ..."
+            setup="$(eqbuddy_download "$CACHE")" || die "download/verification failed"
+            log "SHA-256 verified; installing into $WINEPREFIX (EQBuddy opens when done)"
+            "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" || warn "installer returned non-zero"
+            exe="$(eqbuddy_exe)" || die "installer finished but EQBuddy.exe was not found in the prefix"
+            [ "$(eqbuddy_mode)" = desktop ] || [ "$(eqbuddy_mode)" = window ] || eqbuddy_set_mode desktop
+            log "installed: $exe  (mode: $(eqbuddy_mode)) — it will start with the game"
+            ;;
+        desktop|window|off)
+            eqbuddy_set_mode "$1"; echo "EQBuddy mode: $1 (takes effect next launch)" ;;
+        *)  die "usage: osxeql eqbuddy [install|desktop|window|off]" ;;
+    esac
+}
+
 cmd_doctor() {
     echo "== osxEQL doctor =="
     cmd_status
@@ -96,6 +129,7 @@ case "${1:-}" in
     play)          bash "$HERE/04-launch.sh" ;;
     backend)       shift; bash "$HERE/03-install-backend.sh" "$@" ;;
     res)           shift; cmd_res "$@" ;;
+    eqbuddy)       shift; cmd_eqbuddy "$@" ;;
     status)        cmd_status ;;
     doctor)        cmd_doctor ;;
     ""|-h|--help)  usage ;;

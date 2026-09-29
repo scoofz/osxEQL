@@ -55,6 +55,27 @@ The runtime (Wine + DXMT) is embedded in `osxEQL.app`; the wine prefix and the g
 client live in `~/Library/Application Support/osxEQL/`. Deep technical notes are in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/JOURNEY.md`](docs/JOURNEY.md).
 
+## EQBuddy Evolved companion (optional)
+
+osxEQL can start [EQBuddy Evolved](https://github.com/DranakCorps-bot/EQBuddy) — a
+Windows widget that reads your EverQuest `/log` (kills, DPS, loot, timers…) — together
+with the game, in the same Wine prefix, so it finds your logs with no setup.
+
+- **From the app:** on the first PLAY launch after updating, osxEQL asks once. "Install
+  EQBuddy" downloads the official installer from EQBuddy's GitHub release, checks it
+  against the SHA-256 published next to it, and installs it into the prefix. From then
+  on EQBuddy starts with the game.
+- **From the CLI:** `engine/osxeql eqbuddy install`, then `engine/osxeql eqbuddy
+  desktop|window|off`:
+  - `desktop` (default) — EQBuddy opens **inside** the game's Wine virtual desktop,
+    floating over the game like an overlay;
+  - `window` — EQBuddy gets its own Mac window (handy on a second display);
+  - `off` — never start it (the app stops asking).
+
+EQBuddy Evolved is a separate, proprietary product by its own author: osxEQL never
+bundles or redistributes it — it only fetches the official, signed release and runs it
+unmodified. Closing the game does not close EQBuddy; quit it from its own menu.
+
 ## Build from source (developers)
 
 ```bash

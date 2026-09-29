@@ -32,6 +32,7 @@ rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
 install -m 0755 "$REPO/app/launcher.sh" "$OUT/Contents/MacOS/osxEQL"
 cp "$REPO/app/Info.plist"        "$OUT/Contents/Info.plist"
+install -m 0644 "$REPO/engine/eqbuddy.sh" "$OUT/Contents/Resources/eqbuddy.sh"   # EQBuddy companion (sourced by the launcher)
 cp "$REPO/assets/icon/AppIcon.icns" "$OUT/Contents/Resources/AppIcon.icns"
 echo "compiling setup-window helper…"
 xcrun swiftc -O -o "$OUT/Contents/Resources/osxeql-progress" "$REPO/app/progress-helper.swift" -framework AppKit
