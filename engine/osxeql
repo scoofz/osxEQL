@@ -12,9 +12,10 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
   osxeql import-client <dir>   Copy an existing EQL install into the prefix (testing)
   osxeql play                  Launch the game
   osxeql backend <dxmt|wined3d>  Switch the D3D11->Metal backend
-  osxeql res [auto|max|WxH]    Game window size used by the .app (no arg: show).
-                               auto = fit current main display (default),
-                               max = exact display size, WxH = pin e.g. 3800x1550
+  osxeql res [max|auto|WxH]    Game window size (no arg: show).
+                               max = exact display size (default; in-game
+                               fullscreen works), auto = display minus menu/title
+                               bar (windowed only), WxH = pin e.g. 3800x1550
   osxeql eqbuddy [install|desktop|window|off]
                                EQBuddy Evolved companion (no arg: show).
                                install = fetch the official installer, verify its
@@ -72,16 +73,16 @@ cmd_status() {
 cmd_res() {
     local f="$OSXEQL_HOME/resolution" cur disp
     if [ $# -eq 0 ]; then
-        cur="$(cat "$f" 2>/dev/null || echo auto)"
+        cur="$(cat "$f" 2>/dev/null || echo max)"
         disp="$(osascript -l JavaScript -e 'ObjC.import("CoreGraphics"); const d=$.CGMainDisplayID(); $.CGDisplayPixelsWide(d)+"x"+$.CGDisplayPixelsHigh(d)' 2>/dev/null || echo '?')"
-        echo "setting: $cur   (main display now: $disp; auto = display minus 40x60 chrome)"
+        echo "setting: $cur   (main display now: $disp; max = exactly that, auto = minus 40x60 chrome)"
         return 0
     fi
     case "$1" in
-        auto)          rm -f "$f"; echo "resolution: auto (fit current display at each launch)" ;;
-        max)           echo max > "$f"; echo "resolution: max (exact display size)" ;;
+        max)           rm -f "$f"; echo "resolution: max (exact display size at each launch — the default)" ;;
+        auto)          echo auto > "$f"; echo "resolution: auto (display minus menu/title bar; keep EQ windowed)" ;;
         [0-9]*x[0-9]*) echo "$1" > "$f"; echo "resolution: pinned to $1" ;;
-        *)             die "usage: osxeql res [auto|max|WxH]" ;;
+        *)             die "usage: osxeql res [max|auto|WxH]" ;;
     esac
     echo "takes effect next launch (the .app and osxeql play; OSXEQL_W/OSXEQL_H env still override)"
 }

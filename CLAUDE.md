@@ -70,8 +70,13 @@ patched Wine do. **That symbol is the crux of this whole project.**
    (windowed) and `Width/Height` (in-game fullscreen) — the `.app` pins ALL FOUR plus the
    `explorer /desktop=osxEQL,WxH` size from one resolved value (`resolve_size` in
    `app/launcher.sh`), re-resolved at every launch: env `OSXEQL_W/H` > pin file
-   `~/Library/Application Support/osxEQL/resolution` (`WxH`|`max`|`auto`, set via
-   `osxeql res`) > auto = current main display (CoreGraphics, points) minus 40×60 chrome.
+   `~/Library/Application Support/osxEQL/resolution` (`WxH`|`auto`, set via
+   `osxeql res`) > default `max` = EXACTLY the current main display (CoreGraphics,
+   points). Not display-minus-chrome: EQ's in-game fullscreen requests a display mode of
+   Width×Height and a virtual desktop only offers its own size + smaller standard modes,
+   so an odd size makes EQ fall back to 1280×960 → desktop shrinks, mouse clipped, ini
+   rewritten. At the display size, the player's `Fullscreen` value is left alone;
+   otherwise `Fullscreen=0` is forced. `osxeql play` uses the same rules (`engine/lib.sh`).
    Kyle swaps between a 3840×1600 ultrawide and the built-in display — hardcoded defaults
    WILL break one of them; that's why it auto-detects. **Do NOT drag the window bigger
    mid-game** — DXMT's render surface is fixed at launch; EQ rewrites the ini to the dragged

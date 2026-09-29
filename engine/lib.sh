@@ -71,41 +71,65 @@ wine_env() {
 }
 
 # ---- game window size (gotcha #4) — same rules as the .app's launcher ------
-# The Wine virtual desktop AND all four eqclient.ini size keys must agree, or the
+# The Wine virtual desktop AND the eqclient.ini size keys must agree, or the
 # mouse only reaches part of the window. Precedence, resolved at every launch:
 #   1. OSXEQL_W/OSXEQL_H env vars (e.g. 1280x960 for a headless `patchme` check)
-#   2. $OSXEQL_HOME/resolution — "WxH" pin, "max" or "auto" (osxeql res)
-#   3. auto: current main display (points) minus 40x60 for menu + title bar
-resolve_size() {
-    local pin="" disp dw dh mode=auto
-    if [ -n "${OSXEQL_W:-}" ] && [ -n "${OSXEQL_H:-}" ]; then return 0; fi
-    [ -f "$OSXEQL_HOME/resolution" ] && pin="$(tr -cd '0-9xa-z' < "$OSXEQL_HOME/resolution")"
-    case "$pin" in
-        max) mode=max ;;
-        [0-9]*x[0-9]*) OSXEQL_W="${pin%%x*}"; OSXEQL_H="${pin##*x}"; return 0 ;;
-    esac
+#   2. $OSXEQL_HOME/resolution — "WxH" pin or "auto" (osxeql res)
+#   3. default ("max"): exactly the current main display, in points.
+# Why max by default: EQ's in-game fullscreen asks Wine for a display mode of
+# Width x Height. A virtual desktop only offers its own size plus smaller
+# standard modes, so any odd size (e.g. display minus chrome) makes EQ fall back
+# to a low mode (1280x960): the desktop shrinks, the mouse is clipped to it and
+# EQ rewrites Width/Height. At exactly the display size the mode always exists,
+# fullscreen and windowed are the same size, and the mouse maps 1:1.
+# Sets OSXEQL_FULLDISPLAY=1 when the size IS the display (see pin_eqclient).
+_display_size() {
+    local disp
     disp="$(osascript -l JavaScript -e 'ObjC.import("CoreGraphics"); const d=$.CGMainDisplayID(); $.CGDisplayPixelsWide(d)+"x"+$.CGDisplayPixelsHigh(d)' 2>/dev/null)"
-    dw="${disp%%x*}"; dh="${disp##*x}"
-    case "${dw}${dh}" in *[!0-9]*|"") dw=1920; dh=1080 ;; esac
-    if [ "$mode" = max ]; then OSXEQL_W="$dw"; OSXEQL_H="$dh"
-    else OSXEQL_W=$((dw - 40)); OSXEQL_H=$((dh - 60)); fi
+    DISP_W="${disp%%x*}"; DISP_H="${disp##*x}"
+    case "${DISP_W}${DISP_H}" in *[!0-9]*|"") DISP_W=1920; DISP_H=1080 ;; esac
+}
+resolve_size() {
+    local pin="" mode=max
+    OSXEQL_FULLDISPLAY=0
+    [ -f "$OSXEQL_HOME/resolution" ] && pin="$(tr -cd '0-9xa-z' < "$OSXEQL_HOME/resolution")"
+    if [ -n "${OSXEQL_W:-}" ] && [ -n "${OSXEQL_H:-}" ]; then
+        mode=env
+    else
+        case "$pin" in
+            auto) mode=auto ;;
+            [0-9]*x[0-9]*) mode=pin; OSXEQL_W="${pin%%x*}"; OSXEQL_H="${pin##*x}" ;;
+        esac
+    fi
+    _display_size
+    case "$mode" in
+        max)  OSXEQL_W="$DISP_W"; OSXEQL_H="$DISP_H" ;;
+        auto) OSXEQL_W=$((DISP_W - 40)); OSXEQL_H=$((DISP_H - 60)) ;;
+    esac
+    [ "$OSXEQL_W" = "$DISP_W" ] && [ "$OSXEQL_H" = "$DISP_H" ] && OSXEQL_FULLDISPLAY=1
+    return 0
 }
 
 # Pin eqclient.ini (CRLF, latin-1) to the virtual-desktop size: windowed AND
-# in-game-fullscreen keys, Fullscreen=0. Backup once to eqclient.ini.osxeql-bak.
+# in-game-fullscreen keys. $3=1 (size == display): the player's Fullscreen choice
+# is kept — both modes are the same size then. Otherwise Fullscreen=0 is forced,
+# since a fullscreen request at a non-display size is what triggers the low-mode
+# fallback. Backup once to eqclient.ini.osxeql-bak.
 pin_eqclient() {
     local ini="$EQ_UNIXDIR/eqclient.ini"
     [ -f "$ini" ] || return 0
     [ -f "$ini.osxeql-bak" ] || cp "$ini" "$ini.osxeql-bak"
-    /usr/bin/python3 - "$ini" "$1" "$2" <<'PY'
+    /usr/bin/python3 - "$ini" "$1" "$2" "${3:-0}" <<'PY'
 import sys, re
-p, w, h = sys.argv[1], sys.argv[2], sys.argv[3]
+p, w, h, fulldisplay = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1"
 s = open(p, "rb").read().decode("latin-1")
 def setk(k, v, s):
     pat = re.compile(r'(?im)^(\s*' + re.escape(k) + r'\s*=).*?(\r?)$')
     return pat.sub(lambda m: m.group(1) + v + (m.group(2) or "\r"), s) if pat.search(s) else s
-for k, v in (("Fullscreen", "0"), ("Width", w), ("Height", h),
-             ("WindowedWidth", w), ("WindowedHeight", h)):
+keys = [("Width", w), ("Height", h), ("WindowedWidth", w), ("WindowedHeight", h)]
+if not fulldisplay:
+    keys.insert(0, ("Fullscreen", "0"))
+for k, v in keys:
     s = setk(k, v, s)
 open(p, "wb").write(s.encode("latin-1"))
 PY
