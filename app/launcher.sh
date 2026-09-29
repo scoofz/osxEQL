@@ -430,11 +430,11 @@ OSA
         alert "EQBuddy could not be downloaded or failed its SHA-256 check (see logs/eqbuddy-install.log). The game will start without it; osxEQL will ask again next launch."
         return 0
     fi
-    eqbuddy_set_mode desktop
-    # Install in the background INSIDE the game's virtual desktop: the installer's
-    # own finish step starts EQBuddy, so it opens right there, next to the game.
-    "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" >>"$eqlog" 2>&1 &
-    osa -e 'display notification "Installing EQBuddy Evolved — it opens in the game window when ready." with title "osxEQL"' &
+    eqbuddy_set_mode window
+    # Install in the background; the installer's own finish step starts EQBuddy
+    # (as its own window, floating over the game).
+    "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" >>"$eqlog" 2>&1 &
+    osa -e 'display notification "Installing EQBuddy Evolved — it opens when ready." with title "osxEQL"' &
     EQBUDDY_JUST_INSTALLED=1
 }
 

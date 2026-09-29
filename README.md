@@ -66,11 +66,17 @@ with the game, in the same Wine prefix, so it finds your logs with no setup.
   against the SHA-256 published next to it, and installs it into the prefix. From then
   on EQBuddy starts with the game.
 - **From the CLI:** `engine/osxeql eqbuddy install`, then `engine/osxeql eqbuddy
-  desktop|window|off`:
-  - `desktop` (default) — EQBuddy opens **inside** the game's Wine virtual desktop,
-    floating over the game like an overlay;
-  - `window` — EQBuddy gets its own Mac window (handy on a second display);
+  window|desktop|off`:
+  - `window` (default) — EQBuddy gets its own Mac window, floating over the game;
+  - `desktop` — EQBuddy opens inside the game's Wine virtual desktop (experimental);
   - `off` — never start it (the app stops asking).
+- **Over a fullscreen game:** macOS puts a fullscreen window above every ordinary
+  topmost window, so EQBuddy only shows once the game is windowed. `engine/osxeql
+  overlay` fixes that: it rebuilds just `winemac.so` from the same CrossOver source
+  plus a small opt-in patch (from EQBuddy 1.99.18, MIT) and swaps it into the runtime
+  (backup kept; `--revert` restores it). Needs Xcode command-line tools and
+  `brew install bison`; takes a few minutes. osxEQL then turns on EQBuddy's
+  `WineFloatOverFullscreen` setting for you.
 
 EQBuddy Evolved is a separate, proprietary product by its own author: osxEQL never
 bundles or redistributes it — it only fetches the official, signed release and runs it

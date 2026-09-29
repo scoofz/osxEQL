@@ -15,9 +15,11 @@
 # and the wine environment (see wine_env / the launcher's exports).
 #
 # Mode file $OSXEQL_HOME/eqbuddy — one word:
-#   desktop  start EQBuddy INSIDE the game's Wine virtual desktop (an overlay: it
-#            floats over the game, within the game window)
-#   window   start EQBuddy as its own Mac window (e.g. on a second display)
+#   window   start EQBuddy as its own Mac window, floating over the game (the
+#            default). Over a FULLSCREEN game only with the patched winemac.so
+#            (engine/overlay.sh) — see eqbuddy_sync_float.
+#   desktop  start EQBuddy INSIDE the game's Wine virtual desktop (experimental:
+#            the game can draw over it)
 #   off      never start it (and never ask again)
 #   (absent) not decided yet — the .app asks once on the next PLAY launch
 
@@ -95,10 +97,41 @@ eqbuddy_launch() {
     # A second copy would only ask the running one to show itself (EQBuddy is
     # single-instance), so an already-running EQBuddy is left alone.
     eqbuddy_running && return 0
+    eqbuddy_sync_float "$mode" "$log"
     echo "EQBuddy: starting ($mode): $exe" >>"$log"
     if [ "$mode" = desktop ]; then
         "$WINE" explorer "/desktop=osxEQL,${w}x${h}" "$(eqbuddy_winpath "$exe")" >>"$log" 2>&1 &
     else
         "$WINE" "$exe" >>"$log" 2>&1 &
     fi
+}
+
+# Float over the FULLSCREEN game (window mode only). Needs the patched winemac.so
+# (engine/overlay.sh). EQBuddy itself writes the driver knob
+# (AppDefaults\EQBuddy.exe\Mac Driver\LetTopmostWindowsFloatOverFullscreen) at
+# startup FROM its WineFloatOverFullscreen setting — and writes "N" when the setting
+# is off — so the setting, not the registry, is what has to be turned on. The same
+# setting makes EQBuddy's windows non-activating, so clicking the widget doesn't pull
+# the game out of fullscreen. Edited only while EQBuddy is not running (it rewrites
+# settings.json on exit), and only in a profile it already created.
+eqbuddy_sync_float() {
+    local mode="$1" log="$2" so f
+    [ "$mode" = window ] || return 0
+    so="$(dirname "$WINE")/../lib/wine/x86_64-unix/winemac.so"
+    grep -aq LetTopmostWindowsFloatOverFullscreen "$so" 2>/dev/null || return 0
+    for f in "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/"EQBuddy Evolved"/settings.json; do
+        [ -f "$f" ] || continue
+        /usr/bin/python3 - "$f" >>"$log" 2>&1 <<'PY' || echo "EQBuddy: could not update $f" >>"$log"
+import json, sys
+p = sys.argv[1]
+with open(p, encoding="utf-8-sig") as fh:
+    s = json.load(fh)
+if s.get("WineFloatOverFullscreen") is not True:
+    s["WineFloatOverFullscreen"] = True
+    with open(p + ".osxeql-tmp", "w", encoding="utf-8") as fh:
+        json.dump(s, fh, indent=2, ensure_ascii=False)
+    import os; os.replace(p + ".osxeql-tmp", p)
+    print("EQBuddy: WineFloatOverFullscreen enabled in", p)
+PY
+    done
 }

@@ -19,9 +19,14 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
   osxeql eqbuddy [install|desktop|window|off]
                                EQBuddy Evolved companion (no arg: show).
                                install = fetch the official installer, verify its
-                               SHA-256, install into the prefix, enable (desktop).
-                               desktop = start it inside the game's window,
-                               window = as its own Mac window, off = never
+                               SHA-256, install into the prefix, enable (window).
+                               window = its own Mac window over the game (see
+                               osxeql overlay for fullscreen), desktop = inside
+                               the game's Wine desktop (experimental), off = never
+  osxeql overlay [--status|--revert]
+                               Rebuild winemac.so with the float-over-fullscreen
+                               patch so EQBuddy (eqbuddy window) stays above the
+                               FULLSCREEN game. Needs Xcode CLT + brew bison.
   osxeql status                Show what's installed
   osxeql doctor                Sanity-check the runtime
 
@@ -68,6 +73,7 @@ cmd_status() {
     echo "backend: $(cat "$OSXEQL_HOME/backend.active" 2>/dev/null || echo none)"
     echo "EQL:     $(have_eq && echo "installed ($EQ_UNIXDIR)" || echo 'not installed')"
     echo "EQBuddy: $(eqbuddy_exe || echo 'not installed')  (mode: $(eqbuddy_mode))"
+    echo "overlay: $(grep -aq LetTopmostWindowsFloatOverFullscreen "$WINE_DIR/lib/wine/x86_64-unix/winemac.so" 2>/dev/null && echo 'winemac.so patched (float over fullscreen)' || echo 'stock winemac.so (osxeql overlay to patch)')"
 }
 
 cmd_res() {
@@ -104,7 +110,7 @@ cmd_eqbuddy() {
             log "SHA-256 verified; installing into $WINEPREFIX (EQBuddy opens when done)"
             "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" || warn "installer returned non-zero"
             exe="$(eqbuddy_exe)" || die "installer finished but EQBuddy.exe was not found in the prefix"
-            [ "$(eqbuddy_mode)" = desktop ] || [ "$(eqbuddy_mode)" = window ] || eqbuddy_set_mode desktop
+            [ "$(eqbuddy_mode)" = desktop ] || [ "$(eqbuddy_mode)" = window ] || eqbuddy_set_mode window
             log "installed: $exe  (mode: $(eqbuddy_mode)) — it will start with the game"
             ;;
         desktop|window|off)
@@ -131,6 +137,7 @@ case "${1:-}" in
     backend)       shift; bash "$HERE/03-install-backend.sh" "$@" ;;
     res)           shift; cmd_res "$@" ;;
     eqbuddy)       shift; cmd_eqbuddy "$@" ;;
+    overlay)       shift; bash "$HERE/overlay.sh" "$@" ;;
     status)        cmd_status ;;
     doctor)        cmd_doctor ;;
     ""|-h|--help)  usage ;;

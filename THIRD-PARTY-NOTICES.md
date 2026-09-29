@@ -39,3 +39,17 @@ protection on the game.
 
 This project is an unofficial, fan-made compatibility tool and is not affiliated
 with, endorsed by, or supported by Daybreak Game Company, CodeWeavers, or Apple.
+
+## EQBuddy winemac overlay patch — MIT
+
+`engine/patches/winemac-overlay.patch` (applied to the Wine runtime by
+`engine/overlay.sh` and `engine/build-wine.sh`) comes from EQBuddy 1.99.18,
+`scripts/crossover/winemac-overlay.patch`; `engine/overlay.sh` follows that
+release's `scripts/crossover/setup-overlay.sh`.
+
+- Copyright (c) 2026 David Edwards.
+- License: MIT (https://github.com/DranakCorps-bot/EQBuddy/blob/v1.99.18/LICENSE).
+- Source: https://github.com/DranakCorps-bot/EQBuddy/tree/v1.99.18/scripts/crossover
+
+EQBuddy Evolved itself is a separate, proprietary program. osxEQL does not include
+or redistribute it; `engine/eqbuddy.sh` downloads the official release on request.
