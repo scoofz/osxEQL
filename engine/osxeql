@@ -73,7 +73,7 @@ cmd_status() {
     echo "backend: $(cat "$OSXEQL_HOME/backend.active" 2>/dev/null || echo none)"
     echo "EQL:     $(have_eq && echo "installed ($EQ_UNIXDIR)" || echo 'not installed')"
     echo "EQBuddy: $(eqbuddy_exe || echo 'not installed')  (mode: $(eqbuddy_mode))"
-    echo "overlay: $(grep -aq LetTopmostWindowsFloatOverFullscreen "$WINE_DIR/lib/wine/x86_64-unix/winemac.so" 2>/dev/null && echo 'winemac.so patched (float over fullscreen)' || echo 'stock winemac.so (osxeql overlay to patch)')"
+    echo "overlay: $(overlay_marker_ok "$WINE_DIR/lib/wine/x86_64-unix/winemac.so" && echo 'winemac.so patched (float over fullscreen)' || echo 'stock winemac.so (osxeql overlay to patch)')"
 }
 
 cmd_res() {

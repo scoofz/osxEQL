@@ -118,7 +118,9 @@ eqbuddy_sync_float() {
     local mode="$1" log="$2" so f
     [ "$mode" = window ] || return 0
     so="$(dirname "$WINE")/../lib/wine/x86_64-unix/winemac.so"
-    grep -aq LetTopmostWindowsFloatOverFullscreen "$so" 2>/dev/null || return 0
+    # Marker written by engine/overlay.sh = hash of the patched winemac.so installed.
+    [ -f "$so.osxeql-overlay" ] || return 0
+    [ "$(shasum -a 256 "$so" 2>/dev/null | cut -d' ' -f1)" = "$(tr -cd '0-9a-f' < "$so.osxeql-overlay")" ] || return 0
     for f in "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/"EQBuddy Evolved"/settings.json; do
         [ -f "$f" ] || continue
         /usr/bin/python3 - "$f" >>"$log" 2>&1 <<'PY' || echo "EQBuddy: could not update $f" >>"$log"

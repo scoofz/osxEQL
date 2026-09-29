@@ -135,6 +135,13 @@ open(p, "wb").write(s.encode("latin-1"))
 PY
 }
 
+# True if winemac.so ($1) is the overlay-patched build engine/overlay.sh installed:
+# its marker holds the hash of exactly this file (a later swap/revert invalidates it).
+overlay_marker_ok() {
+    [ -f "$1.osxeql-overlay" ] || return 1
+    [ "$(shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1)" = "$(tr -cd '0-9a-f' < "$1.osxeql-overlay")" ]
+}
+
 have_wine()   { [ -x "$WINE" ]; }
 have_prefix() { [ -f "$WINEPREFIX/system.reg" ]; }
 have_eq()     { [ -f "$EQ_UNIXDIR/eqgame.exe" ]; }

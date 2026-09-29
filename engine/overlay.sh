@@ -45,8 +45,15 @@ runtimes() {
     done
 }
 
-# The patch's registry-knob name is a string literal in the binary: no nm needed.
-is_patched() { grep -aq LetTopmostWindowsFloatOverFullscreen "$1" 2>/dev/null; }
+# A BUILT winemac.so carries the patch if it has the patch's global variable. Ask
+# nm (the symbol table), not grep for the knob name: clang folds the ASCII literal
+# into the inlined ASCII->UTF-16 conversion in get_config_key, so that string is
+# not in the binary at all (first real build, 2026-09-29).
+built_is_patched() { nm "$1" 2>/dev/null | grep -q "$SYMBOL"; }
+
+# An INSTALLED winemac.so is ours if the marker beside it names its exact hash
+# (written by install_so). Cheap and nm-free, so eqbuddy.sh / status use it too.
+is_patched() { overlay_marker_ok "$1"; }
 
 # Re-sign the enclosing .app, if the runtime lives inside one.
 resign_app() {
@@ -61,6 +68,7 @@ install_so() {  # $1 = runtime, $2 = built winemac.so
     [ -f "$so.osxeql-orig" ] || cp "$so" "$so.osxeql-orig"    # keep the very first original
     cp "$2" "$so" || die "could not write $so"
     codesign --force --sign - "$so" >/dev/null 2>&1 || true
+    shasum -a 256 "$so" | cut -d' ' -f1 > "$so.osxeql-overlay"
     resign_app "$1"
     log "patched: $so"
 }
@@ -132,7 +140,7 @@ build_winemac() {  # $1 = an existing winemac.so (to copy its Vulkan soname from
         "CFLAGS=-g -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -DSONAME_LIBVULKAN=\\\"$vk\\\"" \
         >"$LOGDIR/overlay-build.log" 2>&1 ) || die "build failed — see $LOGDIR/overlay-build.log"
     [ -f "$BUILD/dlls/winemac.drv/winemac.so" ] || die "build produced no winemac.so"
-    is_patched "$BUILD/dlls/winemac.drv/winemac.so" || die "built winemac.so lacks the patch symbol"
+    built_is_patched "$BUILD/dlls/winemac.drv/winemac.so" || die "built winemac.so lacks the patch symbol ($SYMBOL) — see $LOGDIR/overlay-build.log"
     # Same ABI guard as build-app.sh: without this bridge DXMT cannot draw (gotcha #1).
     nm -gU "$BUILD/dlls/winemac.drv/winemac.so" | grep -q macdrv_functions \
         || die "built winemac.so does not export macdrv_functions — refusing to install (gotcha #1)"
@@ -154,6 +162,7 @@ case "${1:-}" in
             so="$rt/lib/wine/x86_64-unix/winemac.so"
             [ -f "$so.osxeql-orig" ] || { log "no backup for $rt — leaving it"; continue; }
             cp "$so.osxeql-orig" "$so" && codesign --force --sign - "$so" >/dev/null 2>&1
+            rm -f "$so.osxeql-overlay"
             resign_app "$rt"
             log "restored: $so"
         done <<< "$rts"
