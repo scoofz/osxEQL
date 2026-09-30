@@ -50,8 +50,8 @@ func ident(_ app: NSRunningApplication) -> String {
     return s
 }
 
-func running(_ needle: String) -> [NSRunningApplication] {
-    NSWorkspace.shared.runningApplications.filter { ident($0).contains(needle) }
+func running(_ needle: String, in apps: [NSRunningApplication]? = nil) -> [NSRunningApplication] {
+    (apps ?? NSWorkspace.shared.runningApplications).filter { ident($0).contains(needle) }
 }
 
 func isGameSide(_ s: String) -> Bool {
@@ -71,7 +71,8 @@ var sawBuddy = false
 let started = Date()
 
 func update(front: NSRunningApplication?) {
-    let buddies = running("eqbuddy.exe")
+    let apps = NSWorkspace.shared.runningApplications
+    let buddies = running("eqbuddy.exe", in: apps)
     if buddies.isEmpty {
         // Give EQBuddy time to start; after that, no EQBuddy = nothing left to do.
         if sawBuddy || Date().timeIntervalSince(started) > 120 {
@@ -81,7 +82,7 @@ func update(front: NSRunningApplication?) {
         return
     }
     sawBuddy = true
-    let gameUp = !running("eqgame.exe").isEmpty
+    let gameUp = !running("eqgame.exe", in: apps).isEmpty
     let frontIdent = (front ?? NSWorkspace.shared.frontmostApplication).map(ident) ?? ""
     let show = !gameUp || isGameSide(frontIdent)
     let state = "front=[\(frontIdent.prefix(160))] game=\(gameUp) buddies=\(buddies.map { $0.processIdentifier }) -> \(show ? "show" : "hide")"
@@ -99,14 +100,16 @@ func update(front: NSRunningApplication?) {
 
 let nc = NSWorkspace.shared.notificationCenter
 nc.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { n in
-    update(front: n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
+    autoreleasepool { update(front: n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication) }
 }
 nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { n in
-    if let a = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
-        cmdCache[a.processIdentifier] = nil
-        hiddenByUs.remove(a.processIdentifier)
+    autoreleasepool {
+        if let a = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+            cmdCache[a.processIdentifier] = nil
+            hiddenByUs.remove(a.processIdentifier)
+        }
+        update(front: nil)
     }
-    update(front: nil)
 }
 // ---- Alert sounds -----------------------------------------------------------------
 // EQBuddy plays alerts through WPF's MediaPlayer -> Wine's wmp -> DirectShow. Wine's
@@ -124,7 +127,17 @@ let macClips = ["Ding": "Ping", "Notify": "Glass", "Chimes": "Blow", "Chord": "P
                 // EQBuddy's legacy SystemSounds names (AlertSoundCatalog.Normalize)
                 "Asterisk": "Ping", "Beep": "Pop", "Hand": "Blow", "Question": "Glass"]
 
+var cachedDirs: [URL] = []
+var cachedDirsAt = Date.distantPast
+/// Re-listed at most every 10 s: the profile folder appears once, on EQBuddy's first run.
 func profileDirs() -> [URL] {
+    if Date().timeIntervalSince(cachedDirsAt) < 10 { return cachedDirs }
+    cachedDirs = listProfileDirs()
+    cachedDirsAt = Date()
+    return cachedDirs
+}
+
+func listProfileDirs() -> [URL] {
     guard let prefix else { return [] }
     let users = URL(fileURLWithPath: prefix).appendingPathComponent("drive_c/users")
     let names = (try? FileManager.default.contentsOfDirectory(atPath: users.path)) ?? []
@@ -206,11 +219,40 @@ func pollErrorLogs() {
         note("alert sound -> \((file as NSString).lastPathComponent) @ \(volume)")
     }
 }
-Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in pollErrorLogs() }
-pollErrorLogs()
+// ---- Memory ---------------------------------------------------------------------
+// Every callback runs inside autoreleasepool {}. This is a plain command-line tool
+// (no NSApplication), and RunLoop.main.run() does NOT drain an autorelease pool per
+// iteration the way AppKit's event loop does: the Foundation objects each tick
+// creates (runningApplications arrays, file attribute dictionaries, …) could pile up
+// unfreed, 5 polls a second for hours — the prime suspect for the Mac slowing to a
+// freeze after long sessions (reported 2026-09-30).
+//
+// Hourly, the helper logs the memory footprint of itself, EQBuddy and the game, so a
+// growing process shows up in logs/eqbuddy.log instead of being guessed at.
+func footprintMB(_ pid: pid_t) -> Int {
+    var info = rusage_info_v2()
+    let r = withUnsafeMutablePointer(to: &info) { ptr in
+        ptr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V2, $0) }
+    }
+    return r == 0 ? Int(info.ri_phys_footprint / 1_048_576) : -1
+}
+
+func logMemory() {
+    let apps = NSWorkspace.shared.runningApplications
+    var parts = ["helper \(footprintMB(getpid())) MB"]
+    for (label, needle) in [("EQBuddy", "eqbuddy.exe"), ("eqgame", "eqgame.exe")] {
+        for a in running(needle, in: apps) { parts.append("\(label) \(footprintMB(a.processIdentifier)) MB") }
+    }
+    note("memory: " + parts.joined(separator: ", "))
+}
+
+Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in autoreleasepool { pollErrorLogs() } }
+autoreleasepool { pollErrorLogs() }
 
 // Fallback tick: game started/stopped without an activation, EQBuddy gone, etc.
-Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in update(front: nil) }
+Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in autoreleasepool { update(front: nil) } }
+Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in autoreleasepool { logMemory() } }
+Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { _ in autoreleasepool { logMemory() } }
 note("started (pid \(getpid()), autohide \(autohide ? "on" : "off"), prefix \(prefix ?? "-"))")
-update(front: nil)
+autoreleasepool { update(front: nil) }
 RunLoop.main.run()
