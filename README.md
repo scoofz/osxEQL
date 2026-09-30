@@ -83,11 +83,14 @@ with the game, in the same Wine prefix, so it finds your logs with no setup.
   EQBuddy while another Mac app is frontmost and shows it again when you're back in
   EverQuest. On by default in `window` mode (and EQBuddy's own option is switched
   off so the two don't fight); `engine/osxeql eqbuddy autohide off` disables it.
-- **Alert sounds:** EQBuddy plays its built-in sounds from `C:\Windows\Media`, which a
-  Wine prefix doesn't have, so watch-rule sounds were silent. osxEQL fills it with
-  your Mac's own system sounds (Ping, Glass, Blow, Pop, Hero, Sosumi, Submarine —
-  the mapping EQBuddy 1.x used natively), converted locally with `afconvert`. Spoken
-  alerts still need a Windows speech voice, which Wine doesn't have.
+- **Alert sounds:** EQBuddy plays alerts through WPF's MediaPlayer, which under this
+  Wine (built without GStreamer, where Wine's WAV parser lives) can't play anything —
+  every alert logs `0x80040218` to EQBuddy's `error.log`. The helper watches that log
+  and plays the sound on the Mac with `afplay` instead, with your Mac's system sounds
+  (Ping, Glass, Blow, Pop, Hero, Sosumi, Submarine — the mapping EQBuddy 1.x used
+  natively) at EQBuddy's alert volume. The log line doesn't say which rule fired, so
+  it plays the sound your sound-rules share, or else the shared "Alert sound".
+  Spoken alerts still need a Windows speech voice, which Wine doesn't have.
 
 EQBuddy Evolved is a separate, proprietary product by its own author: osxEQL never
 bundles or redistributes it — it only fetches the official, signed release and runs it
