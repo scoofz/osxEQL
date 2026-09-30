@@ -118,6 +118,7 @@ cmd_eqbuddy() {
             log "SHA-256 verified; installing into $WINEPREFIX (EQBuddy opens when done)"
             "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" || warn "installer returned non-zero"
             exe="$(eqbuddy_exe)" || die "installer finished but EQBuddy.exe was not found in the prefix"
+            eqbuddy_sync_sounds /dev/stderr
             [ "$(eqbuddy_mode)" = desktop ] || [ "$(eqbuddy_mode)" = window ] || eqbuddy_set_mode window
             log "installed: $exe  (mode: $(eqbuddy_mode)) — it will start with the game"
             ;;

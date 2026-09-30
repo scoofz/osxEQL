@@ -97,6 +97,7 @@ eqbuddy_launch() {
     # A second copy would only ask the running one to show itself (EQBuddy is
     # single-instance), so an already-running EQBuddy is left alone.
     eqbuddy_running && return 0
+    eqbuddy_sync_sounds "$log"
     eqbuddy_sync_float "$mode" "$log"
     echo "EQBuddy: starting ($mode): $exe" >>"$log"
     if [ "$mode" = desktop ]; then
@@ -201,4 +202,49 @@ PY
     "$WINE" reg add 'HKCU\Software\Wine\AppDefaults\EQBuddy.exe\Mac Driver' \
         /v LetTopmostWindowsFloatOverFullscreen /t REG_SZ /d Y /f >>"$log" 2>&1 \
         || echo "EQBuddy: could not write the Mac Driver knob" >>"$log"
+}
+
+# ---- alert sounds -------------------------------------------------------------
+# EQBuddy Evolved plays its seven built-in alert sounds from C:\Windows\Media
+# (Windows' own .wav files), and a Wine prefix has none of them: every watch-rule
+# sound resolved to "missing", its "Ding" stand-in too, and alerts were silent.
+# EQBuddy 1.x's native Mac build (MIT) solved the same gap by mapping the built-ins
+# onto the system clips every Mac has (issue #93); we reuse that exact mapping and
+# convert the clips to the .wav names Evolved looks for, locally, with afconvert.
+# Nothing is shipped; existing files are never overwritten.
+EQBUDDY_SOUNDS=(
+    "Windows Ding.wav:Ping"
+    "Windows Notify.wav:Glass"
+    "chimes.wav:Blow"
+    "chord.wav:Pop"
+    "tada.wav:Hero"
+    "Windows Exclamation.wav:Sosumi"
+    "Alarm01.wav:Submarine"
+)
+
+eqbuddy_mac_sound() {  # $1 = clip name -> path of its .aiff (Ping as last resort)
+    local d
+    for d in "$HOME/Library/Sounds" /Library/Sounds /System/Library/Sounds; do
+        [ -f "$d/$1.aiff" ] && { printf '%s\n' "$d/$1.aiff"; return 0; }
+    done
+    [ -f /System/Library/Sounds/Ping.aiff ] && { printf '%s\n' /System/Library/Sounds/Ping.aiff; return 0; }
+    return 1
+}
+
+eqbuddy_sync_sounds() {
+    local log="$1" media="$WINEPREFIX/drive_c/windows/Media" entry wav clip src made=0
+    command -v afconvert >/dev/null 2>&1 || { echo "EQBuddy: afconvert not found — alert sounds not generated" >>"$log"; return 0; }
+    mkdir -p "$media" || return 0
+    for entry in "${EQBUDDY_SOUNDS[@]}"; do
+        wav="${entry%%:*}"; clip="${entry##*:}"
+        [ -s "$media/$wav" ] && continue
+        src="$(eqbuddy_mac_sound "$clip")" || { echo "EQBuddy: no macOS sound for $wav" >>"$log"; continue; }
+        if afconvert -f WAVE -d LEI16@44100 "$src" "$media/$wav" >>"$log" 2>&1; then
+            made=$((made + 1))
+        else
+            rm -f "$media/$wav"; echo "EQBuddy: could not convert $src" >>"$log"
+        fi
+    done
+    [ "$made" -gt 0 ] && echo "EQBuddy: generated $made alert sound(s) in C:\\windows\\Media from macOS system sounds" >>"$log"
+    return 0
 }
