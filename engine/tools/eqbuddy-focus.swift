@@ -46,7 +46,15 @@ func isGameSide(_ s: String) -> Bool {
     s.contains("eqgame.exe") || s.contains("eqbuddy.exe") || s.contains("/desktop=osxeql")
 }
 
+/// One line per decision, to logs/eqbuddy.log (stdout is redirected there).
+func note(_ s: String) {
+    let t = ISO8601DateFormatter().string(from: Date())
+    print("eqbuddy-focus \(t) \(s)")
+    fflush(stdout)
+}
+
 var hiddenByUs = Set<pid_t>()
+var lastState = ""
 var sawBuddy = false
 let started = Date()
 
@@ -54,19 +62,24 @@ func update(front: NSRunningApplication?) {
     let buddies = running("eqbuddy.exe")
     if buddies.isEmpty {
         // Give EQBuddy time to start; after that, no EQBuddy = nothing left to do.
-        if sawBuddy || Date().timeIntervalSince(started) > 120 { exit(0) }
+        if sawBuddy || Date().timeIntervalSince(started) > 120 {
+            note("EQBuddy not running — exiting")
+            exit(0)
+        }
         return
     }
     sawBuddy = true
     let gameUp = !running("eqgame.exe").isEmpty
     let frontIdent = (front ?? NSWorkspace.shared.frontmostApplication).map(ident) ?? ""
     let show = !gameUp || isGameSide(frontIdent)
+    let state = "front=[\(frontIdent.prefix(160))] game=\(gameUp) buddies=\(buddies.map { $0.processIdentifier }) -> \(show ? "show" : "hide")"
+    if state != lastState { note(state); lastState = state }
     for b in buddies {
         let pid = b.processIdentifier
         if show {
             if hiddenByUs.contains(pid) { b.unhide(); hiddenByUs.remove(pid) }
         } else if !b.isHidden {
-            if b.hide() { hiddenByUs.insert(pid) }
+            if b.hide() { hiddenByUs.insert(pid) } else { note("hide() refused for pid \(pid)") }
         }
     }
 }
@@ -84,5 +97,6 @@ nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object:
 }
 // Fallback tick: game started/stopped without an activation, EQBuddy gone, etc.
 Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in update(front: nil) }
+note("started (pid \(getpid()))")
 update(front: nil)
 RunLoop.main.run()

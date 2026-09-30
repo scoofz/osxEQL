@@ -446,6 +446,7 @@ start_eqbuddy(){
         eqbuddy_offer
     fi
     [ "$EQBUDDY_JUST_INSTALLED" = 1 ] && return 0
+    echo "==== $(date) ====" >> "$OSXEQL_HOME/logs/eqbuddy.log"
     eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$OSXEQL_HOME/logs/eqbuddy.log"
 }
 

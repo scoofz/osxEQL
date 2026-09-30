@@ -28,6 +28,8 @@ log "game window: ${OSXEQL_W}x${OSXEQL_H} (osxeql res to change)"
 pin_eqclient "$OSXEQL_W" "$OSXEQL_H" "$OSXEQL_FULLDISPLAY"
 cd "$EQ_UNIXDIR" || die "cd to EQ dir failed"
 # EQBuddy Evolved companion, if installed + enabled (osxeql eqbuddy) — same desktop.
-eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$launchlog"
+# Its own log: the exec below truncates $launchlog, which used to erase these lines.
+echo "==== $(date) ====" >> "$LOGDIR/eqbuddy.log"
+eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$LOGDIR/eqbuddy.log"
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" \
     "$EQ_WINDIR\\LaunchPad.exe" >"$launchlog" 2>&1
