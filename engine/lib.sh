@@ -135,11 +135,13 @@ open(p, "wb").write(s.encode("latin-1"))
 PY
 }
 
-# True if winemac.so ($1) is the overlay-patched build engine/overlay.sh installed:
+# True if the driver $1 is the patched build engine/overlay.sh (marker suffix
+# osxeql-overlay, the default) or engine/audiofix.sh (osxeql-audiofix) installed:
 # its marker holds the hash of exactly this file (a later swap/revert invalidates it).
 overlay_marker_ok() {
-    [ -f "$1.osxeql-overlay" ] || return 1
-    [ "$(shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1)" = "$(tr -cd '0-9a-f' < "$1.osxeql-overlay")" ]
+    local m="$1.${2:-osxeql-overlay}"
+    [ -f "$m" ] || return 1
+    [ "$(shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1)" = "$(tr -cd '0-9a-f' < "$m")" ]
 }
 
 have_wine()   { [ -x "$WINE" ]; }

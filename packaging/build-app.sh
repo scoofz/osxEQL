@@ -64,4 +64,7 @@ grep -aq LetTopmostWindowsFloatOverFullscreen "$OUT/Contents/Resources/Wine/lib/
   || nm "$OUT/Contents/Resources/Wine/lib/wine/x86_64-unix/winemac.so" 2>/dev/null | grep -q topmost_float_over_fullscreen \
   && echo "winemac.so: overlay patch present (EQBuddy floats over fullscreen)" \
   || echo "winemac.so: stock (run engine/osxeql overlay, then rebuild, for the fullscreen overlay)"
+nm "$OUT/Contents/Resources/Wine/lib/wine/x86_64-unix/winecoreaudio.so" 2>/dev/null | grep -q osxeql_follow_default_output \
+  && echo "winecoreaudio.so: follows the macOS default output" \
+  || echo "winecoreaudio.so: stock (run engine/osxeql audiofix, then rebuild, for headphone switching)"
 echo "built: $OUT  ($(du -sh "$OUT" | cut -f1))"

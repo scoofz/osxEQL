@@ -72,6 +72,16 @@ smaller window (fullscreen is then forced off, since that is what breaks it);
 `osxeql res max` returns to the default. The `osxeql play` CLI now uses the same rules
 as the app.
 
+### Sound follows your headphones
+Wine's CoreAudio driver pinned the game's sound to the device that was the macOS
+default when the game started. If that device vanished mid-game — Bluetooth
+headphones out of battery — the sound blasted out of the Mac speakers, ignoring their
+volume and mute, until the game was restarted. The bundled `winecoreaudio.so` now opens
+the game's default-device streams on macOS's *default output* unit, which follows the
+system default: headphones die → speakers, at the speakers' volume/mute; connect other
+headphones → the sound moves to them, no restart. Streams opened on a specific device
+are unchanged; `OSXEQL_PIN_AUDIO_DEVICE=1` restores the old behaviour.
+
 ### EQBuddy Evolved companion
 Everything below is automatic in the app once EQBuddy is installed.
 
@@ -117,6 +127,9 @@ engine/osxeql overlay [--status|--revert]
                                       # rebuild winemac.so with the float-over-fullscreen
                                       # patch (only needed for a self-built runtime; the
                                       # release app already has it). Xcode CLT + brew bison.
+engine/osxeql audiofix [--status|--revert]
+                                      # rebuild winecoreaudio.so so the game's sound follows
+                                      # the macOS default output (same needs as overlay)
 engine/osxeql winlevels [filter] [--delay N]
                                       # list on-screen windows + macOS window levels
                                       # (diagnoses what is drawn above what)
@@ -163,10 +176,12 @@ engine/osxeql backend dxmt
 cd assets/icon && uv run python generate.py && \
   rsvg-convert -w 1024 -h 1024 icon.svg -o icon.png && bash build_icns.sh icon.png && cd ../..
 
-# 4. (osxEQL-Buddy) Patch the runtime's Mac driver so EQBuddy can float over the
-#    fullscreen game. build-wine.sh already applies the patch; for a runtime built
-#    before that, rebuild just winemac.so (minutes). Needs Xcode CLT + brew bison.
+# 4. (osxEQL-Buddy) Patch the Mac driver (EQBuddy floats over the fullscreen game)
+#    and the CoreAudio driver (sound follows the macOS output). build-wine.sh already
+#    applies both; for a runtime built before that, rebuild just those two .so files
+#    (minutes). Needs Xcode CLT + brew bison.
 engine/osxeql overlay
+engine/osxeql audiofix
 
 # 5. Assemble the self-contained app + DMG. build-app.sh also compiles the Swift
 #    helpers (setup window, eqbuddy-focus) and reports whether the overlay patch is in.
@@ -214,7 +229,10 @@ assets/icon/    icon source (generate.py / icon.svg) + AppIcon.icns + build_icns
 engine/         headless CLI + numbered setup scripts + build-wine.sh
   eqbuddy.sh    EQBuddy install/launch, sounds, overlay + autohide settings (also in the .app)
   overlay.sh    rebuild winemac.so with the float-over-fullscreen patch
-  patches/      winemac-overlay.patch (EQBuddy 1.99.18, MIT) + upstream macdrv patch
+  audiofix.sh   rebuild winecoreaudio.so so sound follows the macOS default output
+  driverlib.sh  shared build/install plumbing for overlay.sh + audiofix.sh
+  patches/      winemac-overlay.patch (EQBuddy 1.99.18, MIT), coreaudio-follow-default.py,
+                + upstream macdrv patch
   tools/        eqbuddy-focus.swift (autohide + alert sounds), winlevels.m (diagnostics)
 packaging/      build-app.sh, build-dmg.sh, sign-and-notarize.sh, entitlements.plist,
                 verify-release.sh (check a signed DMG against this source)

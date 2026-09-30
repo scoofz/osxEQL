@@ -21,29 +21,12 @@
 # one — each only once if one is a symlink to the other. An .app is re-signed
 # ad-hoc afterwards (editing a bundle file breaks its signature).
 # Requires: Xcode command-line tools, and bison >= 3 (brew install bison).
-HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"
+# Shared build plumbing: engine/driverlib.sh (also used by engine/audiofix.sh).
+HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/driverlib.sh"
 
-CX_VERSION="${OSXEQL_CX_VERSION:-26.2.0}"      # must match engine/build-wine.sh
 PATCH="$HERE/patches/winemac-overlay.patch"
-WS="$HOME/osxeql-wine-build"                    # shared with build-wine.sh (tarball cache)
-TARBALL="$WS/crossover-sources-${CX_VERSION}.tar.gz"
-WORK="$WS/overlay-${CX_VERSION//./}"
-WINESRC="$WORK/sources/wine"
-BUILD="$WORK/build-winemac"
-APP="${OSXEQL_APP:-/Applications/osxEQL.app}"
 SYMBOL=topmost_float_over_fullscreen
-
-# Unique real paths of the runtimes to patch.
-runtimes() {
-    local seen="" d r
-    for d in "$WINE_DIR" "$APP/Contents/Resources/Wine"; do
-        [ -f "$d/lib/wine/x86_64-unix/winemac.so" ] || continue
-        r="$(cd "$d" && pwd -P)"
-        case "|$seen|" in *"|$r|"*) continue ;; esac
-        seen="$seen|$r"
-        printf '%s\n' "$r"
-    done
-}
+MARK=osxeql-overlay
 
 # A BUILT winemac.so carries the patch if it has the patch's global variable. Ask
 # nm (the symbol table), not grep for the knob name: clang folds the ASCII literal
@@ -51,27 +34,8 @@ runtimes() {
 # not in the binary at all (first real build, 2026-09-29).
 built_is_patched() { nm "$1" 2>/dev/null | grep -q "$SYMBOL"; }
 
-# An INSTALLED winemac.so is ours if the marker beside it names its exact hash
-# (written by install_so). Cheap and nm-free, so eqbuddy.sh / status use it too.
-is_patched() { overlay_marker_ok "$1"; }
-
-# Re-sign the enclosing .app, if the runtime lives inside one.
-resign_app() {
-    local rt="$1" app
-    case "$rt" in */Contents/Resources/Wine) app="${rt%/Contents/Resources/Wine}" ;; *) return 0 ;; esac
-    log "re-signing $app (ad-hoc)"
-    codesign --force --deep --sign - "$app" >/dev/null 2>&1 || warn "codesign of $app failed — it may refuse to launch"
-}
-
-install_so() {  # $1 = runtime, $2 = built winemac.so
-    local so="$1/lib/wine/x86_64-unix/winemac.so"
-    [ -f "$so.osxeql-orig" ] || cp "$so" "$so.osxeql-orig"    # keep the very first original
-    cp "$2" "$so" || die "could not write $so"
-    codesign --force --sign - "$so" >/dev/null 2>&1 || true
-    shasum -a 256 "$so" | cut -d' ' -f1 > "$so.osxeql-overlay"
-    resign_app "$1"
-    log "patched: $so"
-}
+# An INSTALLED winemac.so is ours if the marker beside it names its exact hash.
+is_patched() { marker_ok "$1" "$MARK"; }
 
 patch_is_applied() {  # judge by the tree, not by patch's exit status (partial = failure)
     [ "$(grep -l "$SYMBOL" \
@@ -80,32 +44,9 @@ patch_is_applied() {  # judge by the tree, not by patch's exit status (partial =
         "$WINESRC/dlls/winemac.drv/cocoa_window.m" 2>/dev/null | wc -l | tr -d ' ')" -eq 3 ]
 }
 
-find_bison() {
-    local b
-    for b in /opt/homebrew/opt/bison/bin /usr/local/opt/bison/bin; do
-        [ -x "$b/bison" ] && { printf '%s\n' "$b"; return 0; }
-    done
-    return 1
-}
-
-build_winemac() {  # $1 = an existing winemac.so (to copy its Vulkan soname from)
-    local ref="$1" bisondir vk
-    xcode-select -p >/dev/null 2>&1 || die "Xcode command-line tools missing — run: xcode-select --install"
-    bisondir="$(find_bison)" || die "bison >= 3 not found — run: brew install bison"
+build_winemac() {  # $1 = the runtime's current winemac.so
     [ -f "$PATCH" ] || die "missing $PATCH"
-    mkdir -p "$WS" "$WORK"
-
-    if [ ! -f "$WINESRC/configure" ]; then
-        if [ ! -s "$TARBALL" ]; then
-            log "downloading CrossOver ${CX_VERSION} source (CodeWeavers' LGPL drop)…"
-            curl -fL --retry 3 --progress-bar -o "$TARBALL.part" \
-                "https://media.codeweavers.com/pub/crossover/source/crossover-sources-${CX_VERSION}.tar.gz" \
-                && mv "$TARBALL.part" "$TARBALL" || { rm -f "$TARBALL.part"; die "source download failed"; }
-        fi
-        log "extracting sources/wine…"
-        tar xzf "$TARBALL" -C "$WORK" sources/wine || die "extract failed"
-    fi
-
+    prepare_tree
     if patch_is_applied; then
         log "overlay patch already applied to the source tree"
     else
@@ -113,33 +54,7 @@ build_winemac() {  # $1 = an existing winemac.so (to copy its Vulkan soname from
         ( cd "$WINESRC" && patch -p1 --forward --no-backup-if-mismatch < "$PATCH" ) || true
         patch_is_applied || die "the overlay patch does not apply to CrossOver ${CX_VERSION} (see .rej files under $WINESRC/dlls/winemac.drv)"
     fi
-
-    if [ ! -f "$BUILD/Makefile" ]; then
-        log "configuring (winemac.drv only)…"
-        mkdir -p "$BUILD"
-        ( cd "$BUILD" && PATH="$bisondir:$PATH" CC="clang -arch x86_64" CXX="clang++ -arch x86_64" \
-            "$WINESRC/configure" --host=x86_64-apple-darwin --without-mingw \
-            --enable-archs=none --disable-tests \
-            --without-alsa --without-capi --without-cups --without-dbus --without-ffmpeg \
-            --without-fontconfig --without-freetype --without-gphoto --without-gnutls \
-            --without-gssapi --without-gstreamer --without-hwloc --without-inotify --without-krb5 \
-            --without-netapi --without-opencl --without-oss --without-pcap --without-pcsclite \
-            --without-pulse --without-sane --without-sdl --without-udev --without-unwind \
-            --without-usb --without-v4l2 --without-vulkan --without-wayland >"$LOGDIR/overlay-configure.log" 2>&1 ) \
-            || die "configure failed — see $LOGDIR/overlay-configure.log"
-    fi
-
-    # Keep the Vulkan library name the shipped winemac.so was built with (the runtime's
-    # own build had Vulkan; this winemac-only configure doesn't, so it is passed in).
-    vk="$(strings "$ref" 2>/dev/null | grep -m1 -E '^lib(MoltenVK|vulkan)[A-Za-z0-9._-]*\.dylib$')"
-    vk="${vk:-libMoltenVK.dylib}"
-    log "building winemac.so (Vulkan soname: $vk)…"
-    # Doubled backslashes are load-bearing: make runs each recipe through /bin/sh.
-    ( cd "$BUILD" && PATH="$bisondir:$PATH" \
-        make dlls/winemac.drv/winemac.so -j"$(sysctl -n hw.ncpu)" \
-        "CFLAGS=-g -O2 -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -DSONAME_LIBVULKAN=\\\"$vk\\\"" \
-        >"$LOGDIR/overlay-build.log" 2>&1 ) || die "build failed — see $LOGDIR/overlay-build.log"
-    [ -f "$BUILD/dlls/winemac.drv/winemac.so" ] || die "build produced no winemac.so"
+    make_driver dlls/winemac.drv/winemac.so "$1" "$LOGDIR/overlay-build.log"
     built_is_patched "$BUILD/dlls/winemac.drv/winemac.so" || die "built winemac.so lacks the patch symbol ($SYMBOL) — see $LOGDIR/overlay-build.log"
     # Same ABI guard as build-app.sh: without this bridge DXMT cannot draw (gotcha #1).
     nm -gU "$BUILD/dlls/winemac.drv/winemac.so" | grep -q macdrv_functions \
@@ -152,29 +67,22 @@ rts="$(runtimes)"
 case "${1:-}" in
     --status)
         while IFS= read -r rt; do
-            if is_patched "$rt/lib/wine/x86_64-unix/winemac.so"; then echo "patched:     $rt"
+            if is_patched "$rt/$UNIXLIB/winemac.so"; then echo "patched:     $rt"
             else echo "not patched: $rt"; fi
         done <<< "$rts"
         ;;
     --revert)
-        pgrep -f 'eqgame|LaunchPad|EQBuddy\.exe' >/dev/null && die "quit the game and EQBuddy first"
-        while IFS= read -r rt; do
-            so="$rt/lib/wine/x86_64-unix/winemac.so"
-            [ -f "$so.osxeql-orig" ] || { log "no backup for $rt — leaving it"; continue; }
-            cp "$so.osxeql-orig" "$so" && codesign --force --sign - "$so" >/dev/null 2>&1
-            rm -f "$so.osxeql-overlay"
-            resign_app "$rt"
-            log "restored: $so"
-        done <<< "$rts"
+        game_running && die "quit the game and EQBuddy first"
+        while IFS= read -r rt; do revert_driver "$rt" winemac.so "$MARK"; done <<< "$rts"
         ;;
     "")
-        pgrep -f 'eqgame|LaunchPad|EQBuddy\.exe' >/dev/null && die "quit the game and EQBuddy first (winemac.so is in use)"
+        game_running && die "quit the game and EQBuddy first (winemac.so is in use)"
         built=""
         while IFS= read -r rt; do
-            so="$rt/lib/wine/x86_64-unix/winemac.so"
+            so="$rt/$UNIXLIB/winemac.so"
             if is_patched "$so"; then log "already patched: $rt"; continue; fi
             [ -n "$built" ] || { build_winemac "$so"; built="$BUILD/dlls/winemac.drv/winemac.so"; }
-            install_so "$rt" "$built"
+            install_driver "$rt" "$built" winemac.so "$MARK"
         done <<< "$rts"
         log "done. Next: osxeql eqbuddy window (EQBuddy as its own window), then launch the game."
         ;;
