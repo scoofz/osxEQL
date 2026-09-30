@@ -15,6 +15,9 @@ WINE_SRC="${1:-$HOME/Library/Application Support/osxEQL/Wine}"
 # Fallback: no staged dev runtime (wiped 2026-07-12) — source the runtime from
 # the installed app; it already carries DXMT + the bundled dylibs + ICD json.
 [ -x "$WINE_SRC/bin/wine" ] || WINE_SRC="/Applications/osxEQL.app/Contents/Resources/Wine"
+# Resolve symlinks: `osxeql` users often point ~/…/osxEQL/Wine at the app's runtime,
+# and ditto given a symlink would copy the link, not the runtime.
+WINE_SRC="$(cd "$WINE_SRC" 2>/dev/null && pwd -P)" || { echo "no Wine runtime found"; exit 1; }
 OUT="$REPO/dist/osxEQL.app"
 
 # --- preflight -------------------------------------------------------------
@@ -57,4 +60,8 @@ else
     codesign --verify --deep "$OUT" && echo "signature OK"
 fi
 
+grep -aq LetTopmostWindowsFloatOverFullscreen "$OUT/Contents/Resources/Wine/lib/wine/x86_64-unix/winemac.so" 2>/dev/null \
+  || nm "$OUT/Contents/Resources/Wine/lib/wine/x86_64-unix/winemac.so" 2>/dev/null | grep -q topmost_float_over_fullscreen \
+  && echo "winemac.so: overlay patch present (EQBuddy floats over fullscreen)" \
+  || echo "winemac.so: stock (run engine/osxeql overlay, then rebuild, for the fullscreen overlay)"
 echo "built: $OUT  ($(du -sh "$OUT" | cut -f1))"
