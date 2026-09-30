@@ -36,6 +36,7 @@ install -m 0644 "$REPO/engine/eqbuddy.sh" "$OUT/Contents/Resources/eqbuddy.sh"  
 cp "$REPO/assets/icon/AppIcon.icns" "$OUT/Contents/Resources/AppIcon.icns"
 echo "compiling setup-window helper…"
 xcrun swiftc -O -o "$OUT/Contents/Resources/osxeql-progress" "$REPO/app/progress-helper.swift" -framework AppKit
+xcrun swiftc -O -o "$OUT/Contents/Resources/eqbuddy-focus" "$REPO/engine/tools/eqbuddy-focus.swift" -framework AppKit
 echo "copying Wine runtime ($(du -sh "$WINE_SRC" | cut -f1)) — a moment…"
 ditto "$WINE_SRC" "$OUT/Contents/Resources/Wine"
 

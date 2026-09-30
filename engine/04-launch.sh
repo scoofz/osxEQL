@@ -3,6 +3,7 @@
 # 64-bit eqgame.exe). Runs in a Wine virtual desktop to avoid the launcher's
 # splash-window deadlock. One-shot — NO kill/retry loops (hard rule).
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"
+EQBUDDY_FOCUS_SRC="$HERE/tools/eqbuddy-focus.swift"
 have_wine   || die "wine not staged"
 have_prefix || die "no prefix — run setup first"
 have_eq     || die "EQL not installed in prefix ($EQ_UNIXDIR). Run: osxeql install  (or import-client)"

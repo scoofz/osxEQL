@@ -77,6 +77,12 @@ with the game, in the same Wine prefix, so it finds your logs with no setup.
   (backup kept; `--revert` restores it). Needs Xcode command-line tools and
   `brew install bison`; takes a few minutes. osxEQL then turns on EQBuddy's
   `WineFloatOverFullscreen` setting for you.
+- **Hide when the game isn't in front:** EQBuddy's own "Hide when game unfocused"
+  can't see the game here (it runs in its own Wine virtual desktop), so osxEQL does
+  it from the Mac side: a tiny helper (`engine/tools/eqbuddy-focus.swift`) hides
+  EQBuddy while another Mac app is frontmost and shows it again when you're back in
+  EverQuest. On by default in `window` mode (and EQBuddy's own option is switched
+  off so the two don't fight); `engine/osxeql eqbuddy autohide off` disables it.
 
 EQBuddy Evolved is a separate, proprietary product by its own author: osxEQL never
 bundles or redistributes it — it only fetches the official, signed release and runs it

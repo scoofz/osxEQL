@@ -102,8 +102,66 @@ eqbuddy_launch() {
     if [ "$mode" = desktop ]; then
         "$WINE" explorer "/desktop=osxEQL,${w}x${h}" "$(eqbuddy_winpath "$exe")" >>"$log" 2>&1 &
     else
+        eqbuddy_autohide_prep "$log"
         "$WINE" "$exe" >>"$log" 2>&1 &
+        eqbuddy_start_focus_helper "$log"
     fi
+}
+
+# ---- hide EQBuddy while the game isn't frontmost (window mode) --------------
+# EQBuddy's own "Hide when game unfocused" can't see the game here (it lives in a
+# separate Wine virtual desktop), so osxEQL does it from the Mac side with the
+# eqbuddy-focus helper (engine/tools/eqbuddy-focus.swift). $OSXEQL_HOME/eqbuddy-autohide
+# holds on|off; absent = on.
+EQBUDDY_AUTOHIDE_FILE="$OSXEQL_HOME/eqbuddy-autohide"
+eqbuddy_autohide() {
+    [ "$( [ -f "$EQBUDDY_AUTOHIDE_FILE" ] && tr -cd 'a-z' < "$EQBUDDY_AUTOHIDE_FILE")" = off ] && echo off || echo on
+}
+
+# The helper: $EQBUDDY_FOCUS_BIN if the caller ships one prebuilt (the .app), else
+# built on first use from $EQBUDDY_FOCUS_SRC into $OSXEQL_HOME/bin (the engine).
+eqbuddy_focus_bin() {
+    local log="$1" bin="${EQBUDDY_FOCUS_BIN:-$OSXEQL_HOME/bin/eqbuddy-focus}"
+    if [ -n "${EQBUDDY_FOCUS_SRC:-}" ] && [ -f "$EQBUDDY_FOCUS_SRC" ] \
+       && { [ ! -x "$bin" ] || [ "$EQBUDDY_FOCUS_SRC" -nt "$bin" ]; }; then
+        mkdir -p "$(dirname "$bin")"
+        echo "EQBuddy: building focus helper" >>"$log"
+        xcrun swiftc -O -o "$bin" "$EQBUDDY_FOCUS_SRC" -framework AppKit >>"$log" 2>&1 \
+            || { echo "EQBuddy: focus helper build failed (Xcode command-line tools?)" >>"$log"; return 1; }
+    fi
+    [ -x "$bin" ] && printf '%s\n' "$bin"
+}
+
+# With autohide on, EQBuddy's own focus hide must be OFF — it would otherwise hide
+# the widget for good, since it never sees the game in front. Settings edited only
+# while EQBuddy isn't running (it rewrites settings.json on exit).
+eqbuddy_autohide_prep() {
+    local log="$1" f
+    [ "$(eqbuddy_autohide)" = on ] || return 0
+    for f in "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/"EQBuddy Evolved"/settings.json; do
+        [ -f "$f" ] || continue
+        /usr/bin/python3 - "$f" >>"$log" 2>&1 <<'PY' || echo "EQBuddy: could not update $f" >>"$log"
+import json, os, sys
+p = sys.argv[1]
+with open(p, encoding="utf-8-sig") as fh:
+    s = json.load(fh)
+if s.get("HideWhenGameUnfocused"):
+    s["HideWhenGameUnfocused"] = False
+    with open(p + ".osxeql-tmp", "w", encoding="utf-8") as fh:
+        json.dump(s, fh, indent=2, ensure_ascii=False)
+    os.replace(p + ".osxeql-tmp", p)
+    print("EQBuddy: HideWhenGameUnfocused turned off (osxEQL's focus helper does it instead) in", p)
+PY
+    done
+}
+
+eqbuddy_start_focus_helper() {
+    local log="$1" bin
+    [ "$(eqbuddy_autohide)" = on ] || return 0
+    pgrep -qf 'eqbuddy-focus' && return 0
+    bin="$(eqbuddy_focus_bin "$log")" || return 0
+    echo "EQBuddy: focus helper $bin" >>"$log"
+    nohup "$bin" >>"$log" 2>&1 &
 }
 
 # Float over the FULLSCREEN game (window mode only). Needs the patched winemac.so

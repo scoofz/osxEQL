@@ -2,6 +2,7 @@
 # osxEQL — open-source EverQuest Legends on macOS (Wine + DXMT, no CrossOver).
 # Headless engine CLI. The macOS app is a thin GUI over these same commands.
 HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"
+EQBUDDY_FOCUS_SRC="$HERE/tools/eqbuddy-focus.swift"
 
 usage() {
 cat <<EOF
@@ -16,13 +17,15 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
                                max = exact display size (default; in-game
                                fullscreen works), auto = display minus menu/title
                                bar (windowed only), WxH = pin e.g. 3800x1550
-  osxeql eqbuddy [install|desktop|window|off]
+  osxeql eqbuddy [install|desktop|window|off|autohide [on|off]]
                                EQBuddy Evolved companion (no arg: show).
                                install = fetch the official installer, verify its
                                SHA-256, install into the prefix, enable (window).
                                window = its own Mac window over the game (see
                                osxeql overlay for fullscreen), desktop = inside
                                the game's Wine desktop (experimental), off = never
+                               autohide on|off = hide EQBuddy while the game isn't
+                               the frontmost Mac app (window mode; default on)
   osxeql overlay [--status|--revert]
                                Rebuild winemac.so with the float-over-fullscreen
                                patch so EQBuddy (eqbuddy window) stays above the
@@ -104,6 +107,7 @@ cmd_eqbuddy() {
             exe="$(eqbuddy_exe)" || exe="not installed"
             echo "EQBuddy: $exe"
             echo "mode:    $(eqbuddy_mode)   (desktop|window|off; unset = the app asks once)"
+            echo "autohide: $(eqbuddy_autohide)   (window mode: hidden while the game isn't the frontmost app)"
             ;;
         install)
             have_wine   || die "wine not staged"
@@ -119,7 +123,13 @@ cmd_eqbuddy() {
             ;;
         desktop|window|off)
             eqbuddy_set_mode "$1"; echo "EQBuddy mode: $1 (takes effect next launch)" ;;
-        *)  die "usage: osxeql eqbuddy [install|desktop|window|off]" ;;
+        autohide)
+            case "${2:-}" in
+                on|off) echo "$2" > "$EQBUDDY_AUTOHIDE_FILE"; echo "EQBuddy autohide: $2 (takes effect next launch)" ;;
+                "")     echo "EQBuddy autohide: $(eqbuddy_autohide)" ;;
+                *)      die "usage: osxeql eqbuddy autohide [on|off]" ;;
+            esac ;;
+        *)  die "usage: osxeql eqbuddy [install|desktop|window|off|autohide [on|off]]" ;;
     esac
 }
 

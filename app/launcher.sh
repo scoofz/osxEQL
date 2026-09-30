@@ -411,6 +411,7 @@ install_flow(){
 # failure is logged, told to the user, and the launch continues.
 EQBUDDY_LIB="$RES/eqbuddy.sh"
 [ -f "$EQBUDDY_LIB" ] && . "$EQBUDDY_LIB"
+EQBUDDY_FOCUS_BIN="$RES/eqbuddy-focus"      # built by packaging/build-app.sh
 
 eqbuddy_offer(){
     local choice setup eqlog="$OSXEQL_HOME/logs/eqbuddy-install.log"
