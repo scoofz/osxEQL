@@ -435,6 +435,9 @@ OSA
     # Install in the background; the installer's own finish step starts EQBuddy
     # (as its own window, floating over the game).
     "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" >>"$eqlog" 2>&1 &
+    # Record the version for auto-update. If this install fails, EQBuddy.exe is
+    # missing next launch and eqbuddy_update reinstalls it.
+    command -v eqbuddy_mark_installed >/dev/null 2>&1 && eqbuddy_mark_installed "$setup"
     osa -e 'display notification "Installing EQBuddy Evolved — it opens when ready." with title "osxEQL"' &
     EQBUDDY_JUST_INSTALLED=1
 }
@@ -447,7 +450,13 @@ start_eqbuddy(){
     fi
     [ "$EQBUDDY_JUST_INSTALLED" = 1 ] && return 0
     echo "==== $(date) ====" >> "$OSXEQL_HOME/logs/eqbuddy.log"
-    eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$OSXEQL_HOME/logs/eqbuddy.log"
+    # Update to the latest EQBuddy release if there is one, then start it — in the
+    # background, so LaunchPad never waits on a download (older libs: plain launch).
+    if command -v eqbuddy_update_and_launch >/dev/null 2>&1; then
+        eqbuddy_update_and_launch "$OSXEQL_W" "$OSXEQL_H" "$OSXEQL_HOME/logs/eqbuddy.log"
+    else
+        eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$OSXEQL_HOME/logs/eqbuddy.log"
+    fi
 }
 
 # ---- go ---------------------------------------------------------------------

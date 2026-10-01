@@ -30,6 +30,6 @@ cd "$EQ_UNIXDIR" || die "cd to EQ dir failed"
 # EQBuddy Evolved companion, if installed + enabled (osxeql eqbuddy) — same desktop.
 # Its own log: the exec below truncates $launchlog, which used to erase these lines.
 echo "==== $(date) ====" >> "$LOGDIR/eqbuddy.log"
-eqbuddy_launch "$OSXEQL_W" "$OSXEQL_H" "$LOGDIR/eqbuddy.log"
+eqbuddy_update_and_launch "$OSXEQL_W" "$OSXEQL_H" "$LOGDIR/eqbuddy.log"   # background
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" \
     "$EQ_WINDIR\\LaunchPad.exe" >"$launchlog" 2>&1

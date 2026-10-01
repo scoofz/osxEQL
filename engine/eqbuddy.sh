@@ -82,6 +82,62 @@ eqbuddy_download() {
     printf '%s\n' "$exe"
 }
 
+# ---- keep EQBuddy up to date ------------------------------------------------
+# On every launch (the app and `osxeql play`), before EQBuddy starts, compare the
+# SHA-256 published next to the latest official installer with the one we last
+# installed ($OSXEQL_HOME/eqbuddy-installed.sha256). Different — or EQBuddy missing,
+# or no record yet — and the new installer is downloaded, verified exactly like a
+# first install, and run silently. One ~64-byte request when nothing changed; offline
+# or GitHub down = EQBuddy starts as it is. $OSXEQL_HOME/eqbuddy-autoupdate: on|off
+# (absent = on). EQBuddy's own in-app updater is untouched.
+EQBUDDY_STAMP="$OSXEQL_HOME/eqbuddy-installed.sha256"
+EQBUDDY_AUTOUPDATE_FILE="$OSXEQL_HOME/eqbuddy-autoupdate"
+
+eqbuddy_autoupdate() {
+    [ "$( [ -f "$EQBUDDY_AUTOUPDATE_FILE" ] && tr -cd 'a-z' < "$EQBUDDY_AUTOUPDATE_FILE")" = off ] && echo off || echo on
+}
+
+# Record what was installed: $1 = the verified setup exe (its .sha256 sits beside it).
+eqbuddy_mark_installed() {
+    tr -cd '0-9A-Fa-f' < "$1.sha256" | tr 'A-F' 'a-f' > "$EQBUDDY_STAMP"
+}
+
+# $1 = log, $2 = mode. Never fatal, never touches a running EQBuddy. Set
+# EQBUDDY_FORCE_UPDATE=1 to check even with autoupdate off (osxeql eqbuddy update).
+eqbuddy_update() {
+    local log="$1" mode="${2:-window}" latest have setup
+    [ "$(eqbuddy_autoupdate)" = on ] || [ "${EQBUDDY_FORCE_UPDATE:-0}" = 1 ] || return 0
+    eqbuddy_running && { echo "EQBuddy: running — update check skipped" >>"$log"; return 0; }
+    latest="$(curl -fsSL --max-time 8 "$EQBUDDY_RELEASE_URL/$EQBUDDY_SETUP_NAME.sha256" 2>>"$log" \
+              | tr -cd '0-9A-Fa-f' | tr 'A-F' 'a-f')"
+    [ "${#latest}" -eq 64 ] || { echo "EQBuddy: update check failed (offline?) — starting the installed copy" >>"$log"; return 0; }
+    have="$( [ -f "$EQBUDDY_STAMP" ] && tr -cd '0-9a-f' < "$EQBUDDY_STAMP")"
+    if eqbuddy_exe >/dev/null && [ "$have" = "$latest" ]; then
+        echo "EQBuddy: up to date" >>"$log"; return 0
+    fi
+    echo "EQBuddy: new release (or unknown installed version) — updating" >>"$log"
+    setup="$(eqbuddy_download "$OSXEQL_HOME/cache" 2>>"$log")" || { echo "EQBuddy: update download failed — starting the installed copy" >>"$log"; return 0; }
+    # The installer starts EQBuddy itself when it finishes: prepare its settings first.
+    eqbuddy_sync_sounds "$log"
+    eqbuddy_sync_float "$mode" "$log"
+    [ "$mode" = window ] && eqbuddy_autohide_prep "$log"
+    "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" >>"$log" 2>&1 || echo "EQBuddy: installer returned non-zero" >>"$log"
+    if eqbuddy_exe >/dev/null; then
+        eqbuddy_mark_installed "$setup"
+        echo "EQBuddy: updated to the latest release" >>"$log"
+    fi
+    return 0
+}
+
+# Update (if needed), then launch — in the background, so the game never waits on
+# a download. Same arguments as eqbuddy_launch.
+eqbuddy_update_and_launch() {
+    local mode
+    mode="$(eqbuddy_mode)"
+    case "$mode" in desktop|window) ;; *) return 0 ;; esac
+    ( eqbuddy_update "$3" "$mode"; eqbuddy_launch "$1" "$2" "$3" ) &
+}
+
 # Inno Setup silent-install arguments. /TASKS="" skips the desktop-shortcut task.
 # The installer's [Run] entry starts EQBuddy when it finishes, even when silent.
 EQBUDDY_SETUP_ARGS=(/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /SP- '/TASKS=')
@@ -95,8 +151,9 @@ eqbuddy_launch() {
     case "$mode" in desktop|window) ;; *) return 0 ;; esac
     exe="$(eqbuddy_exe)" || { echo "EQBuddy: mode=$mode but EQBuddy.exe is not installed (osxeql eqbuddy install)" >>"$log"; return 0; }
     # A second copy would only ask the running one to show itself (EQBuddy is
-    # single-instance), so an already-running EQBuddy is left alone.
-    eqbuddy_running && return 0
+    # single-instance), so an already-running EQBuddy is left alone — it may have
+    # just been started by the installer of an update — but it still gets its helper.
+    eqbuddy_running && { eqbuddy_start_focus_helper "$log" "$mode"; return 0; }
     eqbuddy_sync_sounds "$log"
     eqbuddy_sync_float "$mode" "$log"
     echo "EQBuddy: starting ($mode): $exe" >>"$log"

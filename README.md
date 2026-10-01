@@ -89,6 +89,7 @@ Everything below is automatic in the app once EQBuddy is installed.
 |---|---|
 | **Install** | Downloads the official `EQBuddyEvolvedSetup.exe` from EQBuddy's GitHub release, refuses it unless it matches the published `.sha256`, installs it silently into the game's prefix. EQBuddy sees the prefix as `C:\` and finds your logs with no setup. |
 | **Start with the game** | Started next to LaunchPad on every Play, as its own Mac window (`window` mode). |
+| **Always the latest version** | At every launch, before EQBuddy starts, the SHA-256 published next to the latest official installer is compared with the one last installed. A new release (or a missing EQBuddy) is downloaded, verified and installed silently — in the background, the game never waits. Offline: the installed copy starts as is. `osxeql eqbuddy autoupdate off` disables it; `osxeql eqbuddy update` checks now. |
 | **Float over fullscreen** | macOS puts a fullscreen game above every normal "always on top" window. The bundled Mac driver (`winemac.so`) carries a small opt-in patch (from EQBuddy 1.99.18, MIT) that lets EQBuddy's windows sit above it. osxEQL-Buddy writes the driver setting *before* EQBuddy starts (the driver reads it at startup, so EQBuddy's own write only counted on the *next* launch) and turns on EQBuddy's `WineFloatOverFullscreen` option, which also keeps clicks on the widget from pulling the game out of fullscreen. |
 | **Hide when the game isn't in front** | EQBuddy's own "Hide when game unfocused" can't see the game (different Wine desktop). A small macOS helper (`eqbuddy-focus`) watches the frontmost app and hides EQBuddy while you're in another app, showing it again when you're back in EverQuest. EQBuddy's own option is switched off so the two don't fight. |
 | **Alert sounds** | EQBuddy plays alerts through WPF's MediaPlayer, which can't play anything under this Wine (Wine's WAV parser needs GStreamer, which the runtime doesn't ship) — every alert logged `0x80040218`. The helper watches EQBuddy's `error.log` and plays the sound on the Mac with `afplay`, using the macOS system sounds EQBuddy 1.x used natively (Ding→Ping, Notify→Glass, Chimes→Blow, Chord→Pop, Tada→Hero, Exclamation→Sosumi, Alarm→Submarine) at EQBuddy's alert volume. Custom `.wav`/`.mp3` files inside the prefix play as is. |
@@ -122,6 +123,9 @@ engine/osxeql eqbuddy window|desktop|off
                                       # desktop = inside the game's Wine desktop (experimental);
                                       # off = never start it
 engine/osxeql eqbuddy autohide on|off # hide EQBuddy while another app is in front
+engine/osxeql eqbuddy update          # install the latest EQBuddy release now, if newer
+engine/osxeql eqbuddy autoupdate on|off
+                                      # do that automatically at every launch (default on)
 
 engine/osxeql overlay [--status|--revert]
                                       # rebuild winemac.so with the float-over-fullscreen

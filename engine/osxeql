@@ -17,10 +17,12 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
                                max = exact display size (default; in-game
                                fullscreen works), auto = display minus menu/title
                                bar (windowed only), WxH = pin e.g. 3800x1550
-  osxeql eqbuddy [install|desktop|window|off|autohide [on|off]]
+  osxeql eqbuddy [install|update|desktop|window|off|autohide [on|off]|autoupdate [on|off]]
                                EQBuddy Evolved companion (no arg: show).
                                install = fetch the official installer, verify its
                                SHA-256, install into the prefix, enable (window).
+                               update = install the latest release now if newer;
+                               autoupdate on|off = do that at every launch (default on)
                                window = its own Mac window over the game (see
                                osxeql overlay for fullscreen), desktop = inside
                                the game's Wine desktop (experimental), off = never
@@ -113,7 +115,19 @@ cmd_eqbuddy() {
             echo "EQBuddy: $exe"
             echo "mode:    $(eqbuddy_mode)   (desktop|window|off; unset = the app asks once)"
             echo "autohide: $(eqbuddy_autohide)   (window mode: hidden while the game isn't the frontmost app)"
+            echo "autoupdate: $(eqbuddy_autoupdate)   (installed: $( [ -f "$EQBUDDY_STAMP" ] && cut -c1-12 "$EQBUDDY_STAMP" || echo unknown)…)"
             ;;
+        update)
+            have_wine   || die "wine not staged"
+            have_prefix || die "no prefix — run: osxeql setup"
+            wine_env
+            EQBUDDY_FORCE_UPDATE=1 eqbuddy_update /dev/stderr "$(eqbuddy_mode)" ;;
+        autoupdate)
+            case "${2:-}" in
+                on|off) echo "$2" > "$EQBUDDY_AUTOUPDATE_FILE"; echo "EQBuddy autoupdate: $2" ;;
+                "")     echo "EQBuddy autoupdate: $(eqbuddy_autoupdate)" ;;
+                *)      die "usage: osxeql eqbuddy autoupdate [on|off]" ;;
+            esac ;;
         install)
             have_wine   || die "wine not staged"
             have_prefix || die "no prefix — run: osxeql setup"
@@ -123,6 +137,7 @@ cmd_eqbuddy() {
             log "SHA-256 verified; installing into $WINEPREFIX (EQBuddy opens when done)"
             "$WINE" "$setup" "${EQBUDDY_SETUP_ARGS[@]}" || warn "installer returned non-zero"
             exe="$(eqbuddy_exe)" || die "installer finished but EQBuddy.exe was not found in the prefix"
+            eqbuddy_mark_installed "$setup"
             eqbuddy_sync_sounds /dev/stderr
             [ "$(eqbuddy_mode)" = desktop ] || [ "$(eqbuddy_mode)" = window ] || eqbuddy_set_mode window
             log "installed: $exe  (mode: $(eqbuddy_mode)) — it will start with the game"
@@ -135,7 +150,7 @@ cmd_eqbuddy() {
                 "")     echo "EQBuddy autohide: $(eqbuddy_autohide)" ;;
                 *)      die "usage: osxeql eqbuddy autohide [on|off]" ;;
             esac ;;
-        *)  die "usage: osxeql eqbuddy [install|desktop|window|off|autohide [on|off]]" ;;
+        *)  die "usage: osxeql eqbuddy [install|update|desktop|window|off|autohide [on|off]|autoupdate [on|off]]" ;;
     esac
 }
 
