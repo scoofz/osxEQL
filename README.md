@@ -251,7 +251,20 @@ EQBuddy's own errors: `…/osxEQL/prefix/drive_c/users/<you>/AppData/Roaming/EQB
 - **EQBuddy behind the fullscreen game** → `osxeql overlay --status` should say *patched*.
 - **No game sound after headphones changed** → `osxeql audiofix --status`; opt out with
   `OSXEQL_PIN_AUDIO_DEVICE=1`.
-- **Micro-stutters in game** → hold ⌥ Option while opening the app and try one session
+- **Freezes / micro-stutters that get worse over time → check your game log first.**
+  This is the #1 cause seen so far. With `/log` on, EverQuest appends every line of
+  chat and combat to one file per character and never trims it. After weeks of play it
+  can reach hundreds of MB, and EverQuest — and EQBuddy, which reads it live — start
+  hitching on every write. **Quit the game**, then open the game's `Logs` folder
+  (Finder → Go → Go to Folder…, paste):
+  ```
+  ~/Library/Application Support/osxEQL/prefix/drive_c/users/Public/Daybreak Game Company/Installed Games/EverQuest Legends/Logs
+  ```
+  and **delete or move away the big `eqlog_<character>_<server>.txt`** (and `dbg.txt` if
+  it's huge too). EverQuest starts a fresh one next time you `/log`. EQBuddy keeps its
+  own session history, so nothing is lost there. Want to keep the old one? Move it to
+  your Desktop instead of deleting it.
+- **Micro-stutters in game** (log is small) → hold ⌥ Option while opening the app and try one session
   with *EQBuddy: OFF*, then one with EQBuddy ON and *EQBuddy helper: OFF*. From the CLI,
   the same bisect: play once with `osxeql eqbuddy off` (no EQBuddy),
   once with `osxeql eqbuddy helper off` (EQBuddy without the helper). If the stutter
