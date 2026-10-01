@@ -217,12 +217,20 @@ PY
 # The helper does two jobs: autohide (window mode, if on) and alert sounds (always —
 # EQBuddy's own player can't play anything under this Wine; see the helper).
 eqbuddy_start_focus_helper() {
-    local log="$1" mode="${2:-window}" bin ah=off
+    local log="$1" mode="${2:-window}" bin ah=off ac
     pgrep -qf 'eqbuddy-focus' && return 0
     bin="$(eqbuddy_focus_bin "$log")" || return 0
     [ "$mode" = window ] && [ "$(eqbuddy_autohide)" = on ] && ah=on
-    echo "EQBuddy: helper $bin (autohide $ah, alert sounds via afplay)" >>"$log"
-    nohup "$bin" --prefix "$WINEPREFIX" --autohide "$ah" >>"$log" 2>&1 &
+    ac="$(eqbuddy_autoclose)"
+    echo "EQBuddy: helper $bin (autohide $ah, autoclose $ac, alert sounds via afplay)" >>"$log"
+    nohup "$bin" --prefix "$WINEPREFIX" --autohide "$ah" --autoclose "$ac" >>"$log" 2>&1 &
+}
+
+# Close EQBuddy when the game closes (done by the helper, 20 s after eqgame exits).
+# $OSXEQL_HOME/eqbuddy-autoclose: on|off (absent = on).
+EQBUDDY_AUTOCLOSE_FILE="$OSXEQL_HOME/eqbuddy-autoclose"
+eqbuddy_autoclose() {
+    [ "$( [ -f "$EQBUDDY_AUTOCLOSE_FILE" ] && tr -cd 'a-z' < "$EQBUDDY_AUTOCLOSE_FILE")" = off ] && echo off || echo on
 }
 
 # Float over the FULLSCREEN game (window mode only). Needs the patched winemac.so

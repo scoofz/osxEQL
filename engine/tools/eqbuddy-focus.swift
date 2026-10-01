@@ -16,7 +16,9 @@
 // Second job — alert SOUNDS (see "Alert sounds" below): EQBuddy's WPF MediaPlayer
 // cannot play anything under osxEQL's Wine, so the sound is played here with afplay.
 //
-// Usage: eqbuddy-focus --prefix <WINEPREFIX> [--autohide on|off]
+// Third job — close EQBuddy with the game (see "Auto-close" in update()).
+//
+// Usage: eqbuddy-focus --prefix <WINEPREFIX> [--autohide on|off] [--autoclose on|off]
 // Started by engine/eqbuddy.sh next to EQBuddy. Built by packaging/build-app.sh into
 // the .app, or on first use by the engine.
 import AppKit
@@ -27,6 +29,7 @@ func option(_ name: String) -> String? {
     return cliArgs[i + 1]
 }
 let autohide = (option("--autohide") ?? "on") != "off"
+let autoclose = (option("--autoclose") ?? "on") != "off"
 let prefix = option("--prefix")
 
 var cmdCache: [pid_t: String] = [:]
@@ -69,6 +72,12 @@ var hiddenByUs = Set<pid_t>()
 var lastState = ""
 var sawBuddy = false
 let started = Date()
+var sawGame = false
+var gameGoneSince: Date? = nil
+var quitAskedAt: Date? = nil
+/// How long the game must stay gone before EQBuddy is closed: covers a quick
+/// relaunch from LaunchPad (and the gap while eqgame restarts) without closing it.
+let closeGrace: TimeInterval = 20
 
 func update(front: NSRunningApplication?) {
     let apps = NSWorkspace.shared.runningApplications
@@ -87,6 +96,36 @@ func update(front: NSRunningApplication?) {
     let show = !gameUp || isGameSide(frontIdent)
     let state = "front=[\(frontIdent.prefix(160))] game=\(gameUp) buddies=\(buddies.map { $0.processIdentifier }) -> \(show ? "show" : "hide")"
     if state != lastState { note(state); lastState = state }
+
+    // ---- Auto-close: the game was running and is gone for closeGrace -> quit EQBuddy.
+    // Only once the game has been seen in THIS session, so an EQBuddy opened on its
+    // own (no game) is never closed. Graceful first: terminate() is a normal macOS
+    // "Quit", which Wine's Mac driver turns into a Windows end-of-session, so EQBuddy
+    // shuts down cleanly and saves its settings. Forced only if it ignores that for
+    // 30 s. The helper then exits on its own (no EQBuddy left).
+    if gameUp {
+        sawGame = true; gameGoneSince = nil; quitAskedAt = nil
+    } else if autoclose && sawGame {
+        let gone = gameGoneSince ?? Date()
+        gameGoneSince = gone
+        if Date().timeIntervalSince(gone) >= closeGrace {
+            if let asked = quitAskedAt {
+                if Date().timeIntervalSince(asked) > 30 {
+                    note("EQBuddy ignored Quit for 30 s — forcing it closed")
+                    buddies.forEach { _ = $0.forceTerminate() }
+                    quitAskedAt = Date()   // don't spam; the next tick sees it gone
+                }
+            } else {
+                note("game closed \(Int(closeGrace)) s ago — quitting EQBuddy")
+                // Un-hide first: a hidden Wine app may not process the quit request.
+                buddies.forEach { if hiddenByUs.contains($0.processIdentifier) { $0.unhide() }; _ = $0.terminate() }
+                hiddenByUs.removeAll()
+                quitAskedAt = Date()
+            }
+            return
+        }
+    }
+
     guard autohide else { return }
     for b in buddies {
         let pid = b.processIdentifier
@@ -253,6 +292,6 @@ autoreleasepool { pollErrorLogs() }
 Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in autoreleasepool { update(front: nil) } }
 Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in autoreleasepool { logMemory() } }
 Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { _ in autoreleasepool { logMemory() } }
-note("started (pid \(getpid()), autohide \(autohide ? "on" : "off"), prefix \(prefix ?? "-"))")
+note("started (pid \(getpid()), autohide \(autohide ? "on" : "off"), autoclose \(autoclose ? "on" : "off"), prefix \(prefix ?? "-"))")
 autoreleasepool { update(front: nil) }
 RunLoop.main.run()

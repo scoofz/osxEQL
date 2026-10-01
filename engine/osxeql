@@ -17,12 +17,14 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
                                max = exact display size (default; in-game
                                fullscreen works), auto = display minus menu/title
                                bar (windowed only), WxH = pin e.g. 3800x1550
-  osxeql eqbuddy [install|update|desktop|window|off|autohide [on|off]|autoupdate [on|off]]
+  osxeql eqbuddy [install|update|desktop|window|off|autohide|autoclose|autoupdate [on|off]]
                                EQBuddy Evolved companion (no arg: show).
                                install = fetch the official installer, verify its
                                SHA-256, install into the prefix, enable (window).
                                update = install the latest release now if newer;
                                autoupdate on|off = do that at every launch (default on)
+                               autoclose on|off = quit EQBuddy 20 s after the game
+                               closes (default on)
                                window = its own Mac window over the game (see
                                osxeql overlay for fullscreen), desktop = inside
                                the game's Wine desktop (experimental), off = never
@@ -115,6 +117,7 @@ cmd_eqbuddy() {
             echo "EQBuddy: $exe"
             echo "mode:    $(eqbuddy_mode)   (desktop|window|off; unset = the app asks once)"
             echo "autohide: $(eqbuddy_autohide)   (window mode: hidden while the game isn't the frontmost app)"
+            echo "autoclose: $(eqbuddy_autoclose)   (quit EQBuddy 20 s after the game closes)"
             echo "autoupdate: $(eqbuddy_autoupdate)   (installed: $( [ -f "$EQBUDDY_STAMP" ] && cut -c1-12 "$EQBUDDY_STAMP" || echo unknown)…)"
             ;;
         update)
@@ -122,6 +125,12 @@ cmd_eqbuddy() {
             have_prefix || die "no prefix — run: osxeql setup"
             wine_env
             EQBUDDY_FORCE_UPDATE=1 eqbuddy_update /dev/stderr "$(eqbuddy_mode)" ;;
+        autoclose)
+            case "${2:-}" in
+                on|off) echo "$2" > "$EQBUDDY_AUTOCLOSE_FILE"; echo "EQBuddy autoclose: $2 (takes effect next launch)" ;;
+                "")     echo "EQBuddy autoclose: $(eqbuddy_autoclose)" ;;
+                *)      die "usage: osxeql eqbuddy autoclose [on|off]" ;;
+            esac ;;
         autoupdate)
             case "${2:-}" in
                 on|off) echo "$2" > "$EQBUDDY_AUTOUPDATE_FILE"; echo "EQBuddy autoupdate: $2" ;;
@@ -150,7 +159,7 @@ cmd_eqbuddy() {
                 "")     echo "EQBuddy autohide: $(eqbuddy_autohide)" ;;
                 *)      die "usage: osxeql eqbuddy autohide [on|off]" ;;
             esac ;;
-        *)  die "usage: osxeql eqbuddy [install|update|desktop|window|off|autohide [on|off]|autoupdate [on|off]]" ;;
+        *)  die "usage: osxeql eqbuddy [install|update|desktop|window|off|autohide [on|off]|autoclose [on|off]|autoupdate [on|off]]" ;;
     esac
 }
 
