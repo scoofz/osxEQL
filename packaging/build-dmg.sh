@@ -39,6 +39,8 @@ with the EQBuddy Evolved companion. Based on osxEQL by sowoky.
    the game. The game (~7 GB+) downloads through the launcher, not from us.
 4. On the next launch, osxEQL offers to install EQBuddy Evolved (optional). It is
    downloaded from its official GitHub release and checked against its SHA-256.
+5. Settings & troubleshooting: hold the Option (⌥) key while opening the app.
+   "Collect diagnostics" saves a zip on your Desktop to attach to a bug report.
 
 EverQuest Legends is Daybreak's game and is NOT included; EQBuddy Evolved is its
 author's own (proprietary) program and is NOT included either. This is an
@@ -63,6 +65,8 @@ with the EQBuddy Evolved companion. Based on osxEQL by sowoky.
    the game. The game (~7 GB+) downloads through the launcher, not from us.
 4. On the next launch, osxEQL offers to install EQBuddy Evolved (optional). It is
    downloaded from its official GitHub release and checked against its SHA-256.
+5. Settings & troubleshooting: hold the Option (⌥) key while opening the app.
+   "Collect diagnostics" saves a zip on your Desktop to attach to a bug report.
 
 EverQuest Legends is Daybreak's game and is NOT included; EQBuddy Evolved is its
 author's own (proprietary) program and is NOT included either. This is an

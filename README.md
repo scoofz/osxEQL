@@ -58,6 +58,11 @@ a Daybreak / EverQuest Legends account and the official **`EQLegends_setup.exe`*
 5. On the next launch osxEQL asks **once** whether to install **EQBuddy Evolved**. Say yes:
    from then on it opens with the game, stays up to date, and closes with it.
 
+**Settings & troubleshooting, no Terminal needed:** hold **⌥ Option** while opening
+osxEQL-Buddy. A small list lets you switch EQBuddy and each of its extras on or off, and
+**Collect diagnostics** puts a zip on your Desktop (logs, settings, Mac model — no
+passwords) to attach to a bug report. Press **Play** to start the game.
+
 Nothing else to install — no Homebrew, no Xcode, no Wine. The runtime (with the patched
 Mac and audio drivers) and the helpers ship inside the app.
 
@@ -246,7 +251,9 @@ EQBuddy's own errors: `…/osxEQL/prefix/drive_c/users/<you>/AppData/Roaming/EQB
 - **EQBuddy behind the fullscreen game** → `osxeql overlay --status` should say *patched*.
 - **No game sound after headphones changed** → `osxeql audiofix --status`; opt out with
   `OSXEQL_PIN_AUDIO_DEVICE=1`.
-- **Micro-stutters in game** → bisect: play once with `osxeql eqbuddy off` (no EQBuddy),
+- **Micro-stutters in game** → hold ⌥ Option while opening the app and try one session
+  with *EQBuddy: OFF*, then one with EQBuddy ON and *EQBuddy helper: OFF*. From the CLI,
+  the same bisect: play once with `osxeql eqbuddy off` (no EQBuddy),
   once with `osxeql eqbuddy helper off` (EQBuddy without the helper). If the stutter
   only comes with EQBuddy itself, try turning off EQBuddy's own "always on top" extras.
 - **Something broke after a driver patch** → `osxeql overlay --revert` / `osxeql audiofix --revert`.

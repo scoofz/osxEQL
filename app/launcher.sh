@@ -459,6 +459,80 @@ start_eqbuddy(){
     fi
 }
 
+# ---- settings & troubleshooting menu: hold ⌥ Option while opening the app ----
+# For players who only have the .app: every EQBuddy switch the CLI has
+# (osxeql eqbuddy …) as a plain macOS list, plus a one-click diagnostics zip to
+# attach to a bug report. The settings are the same small files in $OSXEQL_HOME.
+option_held(){
+    # NSEvent.modifierFlags is a class property: no Accessibility permission needed.
+    [ "$(osa -l JavaScript -e 'ObjC.import("AppKit"); ($.NSEvent.modifierFlags & 0x80000) ? "1" : "0"')" = 1 ]
+}
+_flag(){ local f="$OSXEQL_HOME/$1"; if [ -f "$f" ]; then tr -cd 'a-z' < "$f"; else printf '%s' "$2"; fi; }
+_onoff(){ [ "$1" = off ] && echo OFF || echo ON; }
+_toggle(){ if [ "$(_flag "$1" on)" = off ]; then echo on > "$OSXEQL_HOME/$1"; else echo off > "$OSXEQL_HOME/$1"; fi; }
+
+collect_diagnostics(){
+    local stamp tmp out so
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    tmp="$(mktemp -d)/osxEQL-Buddy-diagnostics-$stamp"
+    out="$HOME/Desktop/osxEQL-Buddy-diagnostics-$stamp.zip"
+    mkdir -p "$tmp"
+    {
+        echo "osxEQL-Buddy $(/usr/bin/defaults read "$SELF/../Info" CFBundleShortVersionString 2>/dev/null)"
+        /usr/bin/sw_vers
+        /usr/sbin/sysctl -n hw.model machdep.cpu.brand_string hw.memsize
+        echo "game window: ${OSXEQL_W}x${OSXEQL_H}"
+        for f in eqbuddy eqbuddy-autohide eqbuddy-autoclose eqbuddy-autoupdate eqbuddy-helper resolution eqbuddy-installed.sha256; do
+            echo "$f: $(cat "$OSXEQL_HOME/$f" 2>/dev/null || echo '(default)')"
+        done
+        for so in winemac.so.osxeql-overlay winecoreaudio.so.osxeql-audiofix; do
+            [ -f "$WINE_DIR/lib/wine/x86_64-unix/$so" ] && echo "patched: $so" || echo "not patched: $so"
+        done
+        echo "--- processes"; /bin/ps -axo pid,rss,%cpu,command | grep -iE 'eqgame|eqbuddy|LaunchPad|wineserver' | grep -v grep
+    } > "$tmp/summary.txt" 2>&1
+    cp -R "$OSXEQL_HOME/logs" "$tmp/logs" 2>/dev/null
+    cp "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/"EQBuddy Evolved"/error.log "$tmp/eqbuddy-error.log" 2>/dev/null
+    grep -A12 -i '^\[VideoMode\]' "$GAME_DIR/eqclient.ini" > "$tmp/eqclient-videomode.txt" 2>/dev/null
+    if /usr/bin/ditto -c -k --keepParent "$tmp" "$out"; then
+        open -R "$out"
+        osa -e "display alert \"osxEQL-Buddy\" message \"Diagnostics saved on your Desktop:\n$(basename "$out")\n\nAttach it to your bug report. It contains osxEQL-Buddy's logs and settings (no passwords).\""
+    else
+        alert "Could not write the diagnostics zip to your Desktop."
+    fi
+    rm -rf "$(dirname "$tmp")"
+}
+
+settings_menu(){
+    local choice mode list i items
+    while :; do
+        mode="$(_flag eqbuddy unset)"
+        items=(
+            "EQBuddy: $(case "$mode" in (window|desktop) echo ON ;; (*) echo OFF ;; esac)"
+            "Hide EQBuddy when another app is in front: $(_onoff "$(_flag eqbuddy-autohide on)")"
+            "Close EQBuddy with the game: $(_onoff "$(_flag eqbuddy-autoclose on)")"
+            "Update EQBuddy automatically: $(_onoff "$(_flag eqbuddy-autoupdate on)")"
+            "EQBuddy helper (alert sounds, hide, close): $(_onoff "$(_flag eqbuddy-helper on)")"
+            "Collect diagnostics (zip on the Desktop)"
+            "Open the logs folder"
+            "Quit without playing"
+        )
+        list=""; for i in "${items[@]}"; do list="$list${list:+, }\"$i\""; done
+        choice="$(osa -e "choose from list {$list} with title \"osxEQL-Buddy\" with prompt \"Settings & troubleshooting. Pick a line to change it — Play starts the game. (Stutters? Try the game with EQBuddy OFF, then EQBuddy ON with its helper OFF.)\" OK button name \"Change\" cancel button name \"Play\"")"
+        case "$choice" in
+            ""|false)        return 0 ;;
+            "EQBuddy: ON")   eqbuddy_set_mode off ;;
+            "EQBuddy: OFF")  eqbuddy_set_mode window ;;   # installed on launch if missing
+            Hide*)           _toggle eqbuddy-autohide ;;
+            Close*)          _toggle eqbuddy-autoclose ;;
+            Update*)         _toggle eqbuddy-autoupdate ;;
+            "EQBuddy helper"*) _toggle eqbuddy-helper ;;
+            Collect*)        collect_diagnostics ;;
+            Open*)           open "$OSXEQL_HOME/logs" ;;
+            Quit*)           exit 0 ;;
+        esac
+    done
+}
+
 # ---- go ---------------------------------------------------------------------
 if [ ! -f "$GAME_DIR/eqgame.exe" ]; then
     install_flow
@@ -474,6 +548,7 @@ else
     LP_WINPATH="$BOOT_WINPATH"
 fi
 cd "$GAME_DIR" 2>/dev/null || cd "$WINEPREFIX/drive_c"
+command -v eqbuddy_set_mode >/dev/null 2>&1 && option_held && settings_menu
 start_eqbuddy
 # LaunchPad in a wine virtual desktop (avoids its splash-window deadlock).
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" "$LP_WINPATH" >"$LOG" 2>&1
