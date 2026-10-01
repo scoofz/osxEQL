@@ -1,6 +1,6 @@
 #!/bin/bash
 # build-dmg.sh — wrap dist/osxEQL.app into a distributable, compressed DMG.
-# Produces dist/osxEQL-<version>.dmg with a drag-to-Applications layout and a
+# Produces dist/osxEQL-Buddy-<version>.dmg with a drag-to-Applications layout and a
 # short first-open note (the app is unsigned — users right-click → Open once).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -10,7 +10,7 @@ APP="$REPO/dist/osxEQL.app"
 
 VER="$(/usr/bin/defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo 0.0.0)"
 STAGE="$(mktemp -d)/osxEQL"
-DMG="$REPO/dist/osxEQL-$VER.dmg"
+DMG="$REPO/dist/osxEQL-Buddy-$VER.dmg"   # the app inside keeps the name osxEQL.app
 
 mkdir -p "$STAGE"
 ditto "$APP" "$STAGE/osxEQL.app"
@@ -25,7 +25,8 @@ fi
 
 if $IS_SIGNED; then
 cat > "$STAGE/READ ME FIRST.txt" <<'TXT'
-osxEQL — EverQuest Legends on Apple Silicon (open-source Wine + DXMT)
+osxEQL-Buddy — EverQuest Legends on Apple Silicon (open-source Wine + DXMT),
+with the EQBuddy Evolved companion. Based on osxEQL by sowoky.
 
 1. Drag osxEQL onto the Applications folder (shown here).
 2. The first time you open osxEQL, macOS will ask you to confirm since it
@@ -35,15 +36,19 @@ osxEQL — EverQuest Legends on Apple Silicon (open-source Wine + DXMT)
    the official EverQuest Legends site first (you need a Daybreak account).
    osxEQL installs it, then opens the launcher so you can log in and download
    the game. The game (~7 GB+) downloads through the launcher, not from us.
+4. On the next launch, osxEQL offers to install EQBuddy Evolved (optional). It is
+   downloaded from its official GitHub release and checked against its SHA-256.
 
-EverQuest Legends is Daybreak's game and is NOT included. This is an
+EverQuest Legends is Daybreak's game and is NOT included; EQBuddy Evolved is its
+author's own (proprietary) program and is NOT included either. This is an
 unofficial fan-made compatibility tool. See the GitHub page for details.
 
 Signed by Skybound Solutions, LLC. Code signing contributed by @skybound-raz.
 TXT
 else
 cat > "$STAGE/READ ME FIRST.txt" <<'TXT'
-osxEQL — EverQuest Legends on Apple Silicon (open-source Wine + DXMT)
+osxEQL-Buddy — EverQuest Legends on Apple Silicon (open-source Wine + DXMT),
+with the EQBuddy Evolved companion. Based on osxEQL by sowoky.
 
 1. Drag osxEQL onto the Applications folder (shown here).
 2. The app is not signed by Apple, so macOS will block the first open
@@ -54,15 +59,18 @@ osxEQL — EverQuest Legends on Apple Silicon (open-source Wine + DXMT)
    the official EverQuest Legends site first (you need a Daybreak account).
    osxEQL installs it, then opens the launcher so you can log in and download
    the game. The game (~7 GB+) downloads through the launcher, not from us.
+4. On the next launch, osxEQL offers to install EQBuddy Evolved (optional). It is
+   downloaded from its official GitHub release and checked against its SHA-256.
 
-EverQuest Legends is Daybreak's game and is NOT included. This is an
+EverQuest Legends is Daybreak's game and is NOT included; EQBuddy Evolved is its
+author's own (proprietary) program and is NOT included either. This is an
 unofficial fan-made compatibility tool. See the GitHub page for details.
 TXT
 fi
 
 echo "building $DMG"
 rm -f "$DMG"
-hdiutil create -volname "osxEQL" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "osxEQL-Buddy" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$(dirname "$STAGE")"
 
 # Optionally notarize the DMG itself (belt and suspenders — removes all prompts)

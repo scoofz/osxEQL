@@ -41,9 +41,9 @@ projects together on the Mac and fixes what got in the way of playing with both:
 a Daybreak / EverQuest Legends account and the official **`EQLegends_setup.exe`**;
 ~10 GB free disk; internet the first time if you want EQBuddy (≈55 MB).
 
-1. Download **`osxEQL-<version>.dmg`** from this fork's [Releases](../../releases) page and
+1. Download **`osxEQL-Buddy-<version>.dmg`** (1.0.0 is the first release) from this fork's [Releases](../../releases) page and
    drag **osxEQL** into **Applications**.
-   *The app keeps the name `osxEQL.app` and the data folder
+   *The app shows as **osxEQL-Buddy** but keeps the file name `osxEQL.app` and the data folder
    `~/Library/Application Support/osxEQL`, so an existing osxEQL install — prefix, 7 GB
    game client, settings — is reused as is.*
 2. The release is **ad-hoc signed, not notarized by Apple**. Clear the quarantine flag
@@ -278,7 +278,7 @@ engine/osxeql audiofix
 # 5. Assemble the self-contained app + DMG. build-app.sh also compiles the Swift helpers
 #    (setup window, eqbuddy-focus) and reports whether both driver patches are in.
 packaging/build-app.sh        # -> dist/osxEQL.app  (embeds the runtime)
-packaging/build-dmg.sh        # -> dist/osxEQL-<ver>.dmg
+packaging/build-dmg.sh        # -> dist/osxEQL-Buddy-<ver>.dmg
 
 # 6. (Optional) Sign with a Developer ID for Gatekeeper-clean distribution.
 #    Set these env vars — secrets stay local, never in the repo:

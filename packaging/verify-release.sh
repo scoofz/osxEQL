@@ -1,7 +1,7 @@
 #!/bin/bash
 # verify-release.sh — prove a signed osxEQL DMG was actually built from this source.
 #
-#   packaging/verify-release.sh <osxEQL-x.y.z.dmg>
+#   packaging/verify-release.sh <osxEQL-Buddy-x.y.z.dmg>
 #
 # GitHub does not check release assets against the repo, and Apple's notarization
 # only proves WHO signed a binary — not that it matches any source. This script
@@ -24,7 +24,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 DMG="${1:-}"
-[ -n "$DMG" ] && [ -f "$DMG" ] || { echo "usage: packaging/verify-release.sh <osxEQL-x.y.z.dmg>"; exit 1; }
+[ -n "$DMG" ] && [ -f "$DMG" ] || { echo "usage: packaging/verify-release.sh <osxEQL-Buddy-x.y.z.dmg>"; exit 1; }
 
 WORK="$(mktemp -d)"; MNT=""
 cleanup() { [ -n "$MNT" ] && hdiutil detach "$MNT" -quiet 2>/dev/null; rm -rf "$WORK"; }
