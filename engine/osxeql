@@ -125,6 +125,12 @@ cmd_eqbuddy() {
             have_prefix || die "no prefix — run: osxeql setup"
             wine_env
             EQBUDDY_FORCE_UPDATE=1 eqbuddy_update /dev/stderr "$(eqbuddy_mode)" ;;
+        helper)
+            case "${2:-}" in
+                on|off) echo "$2" > "$OSXEQL_HOME/eqbuddy-helper"; echo "EQBuddy helper: $2 (off = no autohide, alert sounds or autoclose; takes effect next launch)" ;;
+                "")     echo "EQBuddy helper: $( [ -f "$OSXEQL_HOME/eqbuddy-helper" ] && cat "$OSXEQL_HOME/eqbuddy-helper" || echo on)" ;;
+                *)      die "usage: osxeql eqbuddy helper [on|off]" ;;
+            esac ;;
         autoclose)
             case "${2:-}" in
                 on|off) echo "$2" > "$EQBUDDY_AUTOCLOSE_FILE"; echo "EQBuddy autoclose: $2 (takes effect next launch)" ;;

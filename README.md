@@ -212,6 +212,8 @@ engine/osxeql eqbuddy window|desktop|off
 engine/osxeql eqbuddy autohide on|off   # hide EQBuddy while another app is in front
 engine/osxeql eqbuddy autoclose on|off  # quit EQBuddy 20 s after the game closes
 engine/osxeql eqbuddy autoupdate on|off # update EQBuddy at every launch
+engine/osxeql eqbuddy helper on|off     # diagnostic: off = no eqbuddy-focus helper at all
+                                        # (no autohide, alert sounds or autoclose)
 
 engine/osxeql overlay  [--status|--revert]   # winemac.so float-over-fullscreen patch
 engine/osxeql audiofix [--status|--revert]   # winecoreaudio.so follow-default-output patch
@@ -244,6 +246,9 @@ EQBuddy's own errors: `…/osxEQL/prefix/drive_c/users/<you>/AppData/Roaming/EQB
 - **EQBuddy behind the fullscreen game** → `osxeql overlay --status` should say *patched*.
 - **No game sound after headphones changed** → `osxeql audiofix --status`; opt out with
   `OSXEQL_PIN_AUDIO_DEVICE=1`.
+- **Micro-stutters in game** → bisect: play once with `osxeql eqbuddy off` (no EQBuddy),
+  once with `osxeql eqbuddy helper off` (EQBuddy without the helper). If the stutter
+  only comes with EQBuddy itself, try turning off EQBuddy's own "always on top" extras.
 - **Something broke after a driver patch** → `osxeql overlay --revert` / `osxeql audiofix --revert`.
 
 ## Known limits

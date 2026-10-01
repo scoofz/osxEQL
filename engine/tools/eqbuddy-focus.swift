@@ -103,19 +103,23 @@ func update(front: NSRunningApplication?) {
     // "Quit", which Wine's Mac driver turns into a Windows end-of-session, so EQBuddy
     // shuts down cleanly and saves its settings. Forced only if it ignores that for
     // 30 s. The helper then exits on its own (no EQBuddy left).
+    // No polling tick: the deadlines below re-run update() themselves (wakeAfter).
     if gameUp {
         sawGame = true; gameGoneSince = nil; quitAskedAt = nil
     } else if autoclose && sawGame {
         let gone = gameGoneSince ?? Date()
+        if gameGoneSince == nil { wakeAfter(closeGrace + 0.5) }
         gameGoneSince = gone
         if Date().timeIntervalSince(gone) >= closeGrace {
             if let asked = quitAskedAt {
                 if Date().timeIntervalSince(asked) > 30 {
                     note("EQBuddy ignored Quit for 30 s — forcing it closed")
                     buddies.forEach { _ = $0.forceTerminate() }
-                    quitAskedAt = Date()   // don't spam; the next tick sees it gone
+                    quitAskedAt = Date()   // don't spam; its termination wakes us
+                    wakeAfter(31)
                 }
             } else {
+                wakeAfter(30.5)            // check whether the Quit was honoured
                 note("game closed \(Int(closeGrace)) s ago — quitting EQBuddy")
                 // Un-hide first: a hidden Wine app may not process the quit request.
                 buddies.forEach { if hiddenByUs.contains($0.processIdentifier) { $0.unhide() }; _ = $0.terminate() }
@@ -137,7 +141,17 @@ func update(front: NSRunningApplication?) {
     }
 }
 
+/// One-shot re-check at a deadline (startup grace, auto-close timers) — replaces the
+/// old 2 s polling tick, so nothing runs while nothing happens.
+func wakeAfter(_ seconds: TimeInterval) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { autoreleasepool { update(front: nil) } }
+}
+
 let nc = NSWorkspace.shared.notificationCenter
+// Event-driven only: app launched (the game starting), activated (focus), terminated.
+nc.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main) { _ in
+    autoreleasepool { update(front: nil) }
+}
 nc.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { n in
     autoreleasepool { update(front: n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication) }
 }
@@ -169,6 +183,7 @@ let macClips = ["Ding": "Ping", "Notify": "Glass", "Chimes": "Blow", "Chord": "P
 var cachedDirs: [URL] = []
 var cachedDirsAt = Date.distantPast
 /// Re-listed at most every 10 s: the profile folder appears once, on EQBuddy's first run.
+/// (With the 30 s re-arm and event-driven reads, this is now rarely hit at all.)
 func profileDirs() -> [URL] {
     if Date().timeIntervalSince(cachedDirsAt) < 10 { return cachedDirs }
     cachedDirs = listProfileDirs()
@@ -285,11 +300,44 @@ func logMemory() {
     note("memory: " + parts.joined(separator: ", "))
 }
 
-Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in autoreleasepool { pollErrorLogs() } }
-autoreleasepool { pollErrorLogs() }
+// ---- Watching error.log without polling ------------------------------------------
+// A kqueue vnode source per error.log (DispatchSource): the kernel wakes us only when
+// EQBuddy writes to it — i.e. only when an alert actually wants a sound. A file that
+// doesn't exist yet (first run), or was rotated/deleted, is (re)armed by a slow 30 s
+// check that only stats a couple of paths. Replaces the 0.5 s poll + 2 s tick that
+// were suspected of game micro-stutters (user report, 2026-10).
+var watchers: [String: DispatchSourceFileSystemObject] = [:]
 
-// Fallback tick: game started/stopped without an activation, EQBuddy gone, etc.
-Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in autoreleasepool { update(front: nil) } }
+func armWatchers() {
+    for dir in profileDirs() {
+        let log = dir.appendingPathComponent("error.log").path
+        if watchers[log] != nil { continue }
+        let fd = open(log, O_EVTONLY)
+        guard fd >= 0 else {
+            if logOffsets[log] == nil { logOffsets[log] = 0 }  // not created yet: read it all once it is
+            continue
+        }
+        let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd,
+                                                            eventMask: [.write, .extend, .delete, .rename],
+                                                            queue: .main)
+        src.setEventHandler {
+            autoreleasepool {
+                if !src.data.isDisjoint(with: [.delete, .rename]) {
+                    src.cancel(); watchers[log] = nil   // re-armed by the next armWatchers()
+                }
+                pollErrorLogs()
+            }
+        }
+        src.setCancelHandler { close(fd) }
+        watchers[log] = src
+        src.resume()
+    }
+}
+
+autoreleasepool { pollErrorLogs(); armWatchers() }   // sets the start offsets, then watches
+Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in autoreleasepool { armWatchers(); pollErrorLogs() } }
+
+wakeAfter(121)   // EQBuddy never showed up within the startup grace -> exit
 Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in autoreleasepool { logMemory() } }
 Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { _ in autoreleasepool { logMemory() } }
 note("started (pid \(getpid()), autohide \(autohide ? "on" : "off"), autoclose \(autoclose ? "on" : "off"), prefix \(prefix ?? "-"))")

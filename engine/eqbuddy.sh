@@ -218,6 +218,10 @@ PY
 # EQBuddy's own player can't play anything under this Wine; see the helper).
 eqbuddy_start_focus_helper() {
     local log="$1" mode="${2:-window}" bin ah=off ac
+    # Diagnostic switch (osxeql eqbuddy helper off): no helper at all — no autohide,
+    # no alert sounds, no autoclose. For bisecting stutters/glitches.
+    [ "$( [ -f "$OSXEQL_HOME/eqbuddy-helper" ] && tr -cd 'a-z' < "$OSXEQL_HOME/eqbuddy-helper")" = off ] \
+        && { echo "EQBuddy: helper disabled (osxeql eqbuddy helper on)" >>"$log"; return 0; }
     pgrep -qf 'eqbuddy-focus' && return 0
     bin="$(eqbuddy_focus_bin "$log")" || return 0
     [ "$mode" = window ] && [ "$(eqbuddy_autohide)" = on ] && ah=on
