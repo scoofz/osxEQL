@@ -121,7 +121,7 @@ start_progress_window(){
 
 # ---- sanity: runtime present ----------------------------------------------
 if [ ! -x "$WINE" ]; then
-    alert "This osxEQL.app is missing its Wine runtime (Contents/Resources/Wine). Re-download the full app from GitHub."
+    alert "This app is missing its Wine runtime (Contents/Resources/Wine). Re-download the full app from GitHub."
     exit 1
 fi
 

@@ -42,17 +42,17 @@ a Daybreak / EverQuest Legends account and the official **`EQLegends_setup.exe`*
 ~10 GB free disk; internet the first time if you want EQBuddy (≈55 MB).
 
 1. Download **`osxEQL-Buddy-<version>.dmg`** (1.0.0 is the first release) from this fork's [Releases](../../releases) page and
-   drag **osxEQL** into **Applications**.
-   *The app shows as **osxEQL-Buddy** but keeps the file name `osxEQL.app` and the data folder
-   `~/Library/Application Support/osxEQL`, so an existing osxEQL install — prefix, 7 GB
-   game client, settings — is reused as is.*
+   drag **osxEQL-Buddy** into **Applications**.
+   *Coming from osxEQL? Delete the old `osxEQL.app`: osxEQL-Buddy keeps the same data
+   folder, `~/Library/Application Support/osxEQL`, so your prefix, 7 GB game client and
+   settings are reused as is.*
 2. The release is **ad-hoc signed, not notarized by Apple**. Clear the quarantine flag
    once before the first launch (or right-click → **Open** the first time):
    ```bash
-   xattr -dr com.apple.quarantine /Applications/osxEQL.app
+   xattr -dr com.apple.quarantine /Applications/osxEQL-Buddy.app
    ```
 3. Download **`EQLegends_setup.exe`** from the official EverQuest Legends site.
-4. Launch **osxEQL**. A setup window walks the whole install: pick the installer when
+4. Launch **osxEQL-Buddy**. A setup window walks the whole install: pick the installer when
    asked, then watch it run Daybreak's installer, update the launcher and download the
    game — a chime tells you when the login screen is ready. Log in, hit **Play**.
 5. On the next launch osxEQL asks **once** whether to install **EQBuddy Evolved**. Say yes:
@@ -87,7 +87,7 @@ Mac and audio drivers) and the helpers ship inside the app.
 - **DXMT** ([3Shain/dxmt](https://github.com/3Shain/dxmt)) translates Direct3D 11 to
   **Metal** — the open-source alternative to Apple's proprietary D3DMetal.
 
-The runtime (Wine + DXMT + the libraries it needs) is embedded in `osxEQL.app`. The Wine
+The runtime (Wine + DXMT + the libraries it needs) is embedded in `osxEQL-Buddy.app`. The Wine
 *prefix* — a little Windows `C:\` drive — and the game client live in
 `~/Library/Application Support/osxEQL/`. On launch, the app starts Daybreak's
 **LaunchPad** inside a Wine **virtual desktop** (a single Mac window the game draws into;
@@ -125,7 +125,7 @@ reused here (see [License & credits](#license--credits)).
 ## How the two run together
 
 ```
-osxEQL.app ──► Wine virtual desktop "osxEQL" ──► LaunchPad ──► eqgame.exe ──► writes /log
+osxEQL-Buddy.app ─► Wine virtual desktop "osxEQL" ─► LaunchPad ──► eqgame.exe ──► writes /log
      │                                                                          │
      ├─► (background) update check ──► EQBuddy.exe  ◄── reads the same /log ───┘
      │                                  (own Mac window, same Wine prefix: sees it as C:\)
@@ -220,9 +220,10 @@ engine/osxeql audiofix [--status|--revert]   # winecoreaudio.so follow-default-o
 engine/osxeql winlevels [filter] [--delay N] # on-screen windows + macOS window levels
 ```
 
-If the CLI says `wine: not staged`, point it at the app's runtime once:
+If the CLI says `wine: not staged` (or stopped working after replacing `osxEQL.app` by
+`osxEQL-Buddy.app`), point it at the app's runtime:
 ```bash
-ln -s /Applications/osxEQL.app/Contents/Resources/Wine "$HOME/Library/Application Support/osxEQL/Wine"
+ln -sfn /Applications/osxEQL-Buddy.app/Contents/Resources/Wine "$HOME/Library/Application Support/osxEQL/Wine"
 ```
 
 ## Logs & troubleshooting
@@ -277,7 +278,7 @@ engine/osxeql audiofix
 
 # 5. Assemble the self-contained app + DMG. build-app.sh also compiles the Swift helpers
 #    (setup window, eqbuddy-focus) and reports whether both driver patches are in.
-packaging/build-app.sh        # -> dist/osxEQL.app  (embeds the runtime)
+packaging/build-app.sh        # -> dist/osxEQL-Buddy.app  (embeds the runtime)
 packaging/build-dmg.sh        # -> dist/osxEQL-Buddy-<ver>.dmg
 
 # 6. (Optional) Sign with a Developer ID for Gatekeeper-clean distribution.

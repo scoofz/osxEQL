@@ -17,7 +17,7 @@
 #   engine/overlay.sh --revert   restore the original winemac.so
 #   engine/overlay.sh --status   show whether each runtime is patched
 #
-# Runtimes touched: $WINE_DIR (the engine's) and /Applications/osxEQL.app's embedded
+# Runtimes touched: $WINE_DIR (the engine's) and the installed app's (osxEQL-Buddy.app or osxEQL.app) embedded
 # one — each only once if one is a symlink to the other. An .app is re-signed
 # ad-hoc afterwards (editing a bundle file breaks its signature).
 # Requires: Xcode command-line tools, and bison >= 3 (brew install bison).

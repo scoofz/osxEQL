@@ -22,14 +22,15 @@ Metal view to the Wine window. Stock Wine doesn't export it; CrossOver's build a
 patched Wine do. **That symbol is the crux of this whole project.**
 
 ## Where everything lives
-- **The app:** `/Applications/osxEQL.app` — double-click → Daybreak LaunchPad → log in →
+- **The app:** `/Applications/osxEQL-Buddy.app` (osxEQL-Buddy 1.0+; `osxEQL.app` before
+  the fork's rename — scripts accept either) — double-click → Daybreak LaunchPad → log in →
   Play → game renders via DXMT. Since v0.2.1 the bundle also carries the Homebrew dylibs
   wine dlopens (`Wine/lib/lib*.dylib`, staged by `packaging/bundle-dylibs.sh`), so the DMG
   runs on Macs with no Intel Homebrew.
 - **The runtime ("bottle"):** `~/Library/Application Support/osxEQL/`
   - Since the 2026-07-12 clean-Mac wipe + fresh-DMG test, kyle-mac looks like a USER
     machine: **no staged `Wine/` dev runtime, no `prefix-cx/`** — the wine runtime lives
-    ONLY inside `/Applications/osxEQL.app/Contents/Resources/Wine` (build-app.sh falls
+    ONLY inside the installed app's `Contents/Resources/Wine` (build-app.sh falls
     back to it as WINE_SRC), and Intel Homebrew is gone (reinstall it + rerun
     `engine/build-wine.sh` if a runtime rebuild is ever needed).
   - The runtime is our **self-built CrossOver 26.2.0 Wine** — compiled from CodeWeavers'

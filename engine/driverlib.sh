@@ -13,7 +13,13 @@ TARBALL="$WS/crossover-sources-${CX_VERSION}.tar.gz"
 WORK="$WS/overlay-${CX_VERSION//./}"
 WINESRC="$WORK/sources/wine"
 BUILD="$WORK/build-winemac"                     # name kept: existing trees stay reusable
-APP="${OSXEQL_APP:-/Applications/osxEQL.app}"
+# The installed app: osxEQL-Buddy.app (1.0+), or a pre-1.0 osxEQL.app.
+if [ -z "${OSXEQL_APP:-}" ]; then
+    for OSXEQL_APP in /Applications/osxEQL-Buddy.app /Applications/osxEQL.app; do
+        [ -d "$OSXEQL_APP" ] && break
+    done
+fi
+APP="$OSXEQL_APP"
 UNIXLIB="lib/wine/x86_64-unix"
 
 # Unique real paths of the runtimes to patch: the engine's and the app's (once if one

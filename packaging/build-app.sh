@@ -1,5 +1,5 @@
 #!/bin/bash
-# build-app.sh — assemble the self-contained, relocatable osxEQL.app into dist/.
+# build-app.sh — assemble the self-contained, relocatable osxEQL-Buddy.app into dist/.
 #
 # Embeds the portable Wine runtime (DXMT baked in) under Contents/Resources/Wine.
 # The game client + prefix are NOT bundled — they live in ~/Library/Application
@@ -14,11 +14,16 @@ REPO="$(cd "$HERE/.." && pwd)"
 WINE_SRC="${1:-$HOME/Library/Application Support/osxEQL/Wine}"
 # Fallback: no staged dev runtime (wiped 2026-07-12) — source the runtime from
 # the installed app; it already carries DXMT + the bundled dylibs + ICD json.
-[ -x "$WINE_SRC/bin/wine" ] || WINE_SRC="/Applications/osxEQL.app/Contents/Resources/Wine"
+# (the installed osxEQL-Buddy.app, or a pre-1.0 osxEQL.app).
+if [ ! -x "$WINE_SRC/bin/wine" ]; then
+    for _app in /Applications/osxEQL-Buddy.app /Applications/osxEQL.app; do
+        [ -x "$_app/Contents/Resources/Wine/bin/wine" ] && { WINE_SRC="$_app/Contents/Resources/Wine"; break; }
+    done
+fi
 # Resolve symlinks: `osxeql` users often point ~/…/osxEQL/Wine at the app's runtime,
 # and ditto given a symlink would copy the link, not the runtime.
 WINE_SRC="$(cd "$WINE_SRC" 2>/dev/null && pwd -P)" || { echo "no Wine runtime found"; exit 1; }
-OUT="$REPO/dist/osxEQL.app"
+OUT="$REPO/dist/osxEQL-Buddy.app"
 
 # --- preflight -------------------------------------------------------------
 [ -x "$WINE_SRC/bin/wine" ]                                   || { echo "no wine at $WINE_SRC/bin/wine"; exit 1; }
