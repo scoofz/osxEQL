@@ -63,3 +63,8 @@ release's `scripts/crossover/setup-overlay.sh`, and `engine/tools/winlevels.m`
 
 EQBuddy Evolved itself is a separate, proprietary program. osxEQL does not include
 or redistribute it; `engine/eqbuddy.sh` downloads the official release on request.
+
+EQ Legends Companion (https://github.com/jmoyers/everquest-companion, © Josh Moyers,
+FSL-1.1-MIT) is likewise a separate program that osxEQL-Buddy does not include or
+redistribute; `engine/eqlcompanion.sh` downloads its official release on request,
+verifies it against the SHA-512 in the release's `latest.yml`, and runs it unmodified.

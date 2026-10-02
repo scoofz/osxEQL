@@ -222,12 +222,12 @@ eqbuddy_start_focus_helper() {
     # no alert sounds, no autoclose. For bisecting stutters/glitches.
     [ "$( [ -f "$OSXEQL_HOME/eqbuddy-helper" ] && tr -cd 'a-z' < "$OSXEQL_HOME/eqbuddy-helper")" = off ] \
         && { echo "EQBuddy: helper disabled (osxeql eqbuddy helper on)" >>"$log"; return 0; }
-    pgrep -qf 'eqbuddy-focus' && return 0
+    pgrep -qf 'eqbuddy-focus.*--app eqbuddy\.exe' && return 0
     bin="$(eqbuddy_focus_bin "$log")" || return 0
     [ "$mode" = window ] && [ "$(eqbuddy_autohide)" = on ] && ah=on
     ac="$(eqbuddy_autoclose)"
     echo "EQBuddy: helper $bin (autohide $ah, autoclose $ac, alert sounds via afplay)" >>"$log"
-    nohup "$bin" --prefix "$WINEPREFIX" --autohide "$ah" --autoclose "$ac" >>"$log" 2>&1 &
+    nohup "$bin" --prefix "$WINEPREFIX" --app eqbuddy.exe --sounds on --autohide "$ah" --autoclose "$ac" >>"$log" 2>&1 &
 }
 
 # Close EQBuddy when the game closes (done by the helper, 20 s after eqgame exits).
