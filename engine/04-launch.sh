@@ -2,7 +2,7 @@
 # Launch EQL: starts the Daybreak LaunchPad (which authenticates, then spawns the
 # 64-bit eqgame.exe). Runs in a Wine virtual desktop to avoid the launcher's
 # splash-window deadlock. One-shot — NO kill/retry loops (hard rule).
-HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"; . "$HERE/eqlcompanion.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"
 EQBUDDY_FOCUS_SRC="$HERE/tools/eqbuddy-focus.swift"
 have_wine   || die "wine not staged"
 have_prefix || die "no prefix — run setup first"
@@ -31,6 +31,5 @@ cd "$EQ_UNIXDIR" || die "cd to EQ dir failed"
 # Its own log: the exec below truncates $launchlog, which used to erase these lines.
 echo "==== $(date) ====" >> "$LOGDIR/eqbuddy.log"
 eqbuddy_update_and_launch "$OSXEQL_W" "$OSXEQL_H" "$LOGDIR/eqbuddy.log"   # background
-eqlc_update_and_launch "$LOGDIR/eqlc.log"                                   # background
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" \
     "$EQ_WINDIR\\LaunchPad.exe" >"$launchlog" 2>&1

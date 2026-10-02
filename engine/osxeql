@@ -1,7 +1,7 @@
 #!/bin/bash
 # osxEQL — open-source EverQuest Legends on macOS (Wine + DXMT, no CrossOver).
 # Headless engine CLI. The macOS app is a thin GUI over these same commands.
-HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"; . "$HERE/eqlcompanion.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"; . "$HERE/lib.sh"; . "$HERE/eqbuddy.sh"
 EQBUDDY_FOCUS_SRC="$HERE/tools/eqbuddy-focus.swift"
 
 usage() {
@@ -30,11 +30,6 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
                                the game's Wine desktop (experimental), off = never
                                autohide on|off = hide EQBuddy while the game isn't
                                the frontmost Mac app (window mode; default on)
-  osxeql eqlc [install|update|window|off|autoupdate [on|off]]
-                               EQ Legends Companion (no arg: show). install/update =
-                               official release, SHA-512 checked; window = start it
-                               with the game; off = never. Shares autohide/autoclose
-                               (osxeql eqbuddy autohide|autoclose) with EQBuddy.
   osxeql overlay [--status|--revert]
                                Rebuild winemac.so with the float-over-fullscreen
                                patch so EQBuddy (eqbuddy window) stays above the
@@ -96,7 +91,6 @@ cmd_status() {
     echo "backend: $(cat "$OSXEQL_HOME/backend.active" 2>/dev/null || echo none)"
     echo "EQL:     $(have_eq && echo "installed ($EQ_UNIXDIR)" || echo 'not installed')"
     echo "EQBuddy: $(eqbuddy_exe || echo 'not installed')  (mode: $(eqbuddy_mode))"
-    echo "EQ Legends Companion: $(eqlc_exe || echo 'not installed')  (mode: $(eqlc_mode), version: $(cat "$EQLC_STAMP" 2>/dev/null || echo '?'))"
     echo "audio:   $(overlay_marker_ok "$WINE_DIR/lib/wine/x86_64-unix/winecoreaudio.so" osxeql-audiofix && echo 'follows the macOS default output' || echo 'stock, pinned to one device (osxeql audiofix)')"
     echo "overlay: $(overlay_marker_ok "$WINE_DIR/lib/wine/x86_64-unix/winemac.so" && echo 'winemac.so patched (float over fullscreen)' || echo 'stock winemac.so (osxeql overlay to patch)')"
 }
@@ -178,36 +172,6 @@ cmd_eqbuddy() {
     esac
 }
 
-cmd_eqlc() {
-    case "${1:-}" in
-        "")
-            echo "EQ Legends Companion: $(eqlc_exe || echo 'not installed')"
-            echo "mode:       $(eqlc_mode)   (window|off; unset = the app asks once)"
-            echo "version:    $(cat "$EQLC_STAMP" 2>/dev/null || echo unknown)   latest: $(eqlc_latest | cut -f1)"
-            echo "autoupdate: $(eqlc_autoupdate)" ;;
-        install|update)
-            have_wine   || die "wine not staged"
-            have_prefix || die "no prefix — run: osxeql setup"
-            wine_env
-            eqlc_running && die "quit EQ Legends Companion first"
-            if [ "$1" = install ]; then
-                eqlc_install /dev/stderr || die "install failed"
-            else
-                EQLC_FORCE_UPDATE=1 eqlc_update /dev/stderr
-            fi
-            [ "$(eqlc_mode)" = window ] || eqlc_set_mode window
-            log "EQ Legends Companion: $(eqlc_exe || echo 'not installed') — it will start with the game" ;;
-        window|off) eqlc_set_mode "$1"; echo "EQ Legends Companion: $1 (takes effect next launch)" ;;
-        autoupdate)
-            case "${2:-}" in
-                on|off) echo "$2" > "$EQLC_AUTOUPDATE_FILE"; echo "EQ Legends Companion autoupdate: $2" ;;
-                "")     echo "EQ Legends Companion autoupdate: $(eqlc_autoupdate)" ;;
-                *)      die "usage: osxeql eqlc autoupdate [on|off]" ;;
-            esac ;;
-        *) die "usage: osxeql eqlc [install|update|window|off|autoupdate [on|off]]" ;;
-    esac
-}
-
 cmd_winlevels() {
     local bin="$OSXEQL_HOME/bin/winlevels" src="$HERE/tools/winlevels.m" filter="" delay=0
     while [ $# -gt 0 ]; do
@@ -243,7 +207,6 @@ case "${1:-}" in
     backend)       shift; bash "$HERE/03-install-backend.sh" "$@" ;;
     res)           shift; cmd_res "$@" ;;
     eqbuddy)       shift; cmd_eqbuddy "$@" ;;
-    eqlc)          shift; cmd_eqlc "$@" ;;
     overlay)       shift; bash "$HERE/overlay.sh" "$@" ;;
     audiofix)      shift; bash "$HERE/audiofix.sh" "$@" ;;
     winlevels)     shift; cmd_winlevels "$@" ;;

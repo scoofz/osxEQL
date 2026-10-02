@@ -412,7 +412,6 @@ install_flow(){
 EQBUDDY_LIB="$RES/eqbuddy.sh"
 [ -f "$EQBUDDY_LIB" ] && . "$EQBUDDY_LIB"
 EQBUDDY_FOCUS_BIN="$RES/eqbuddy-focus"      # built by packaging/build-app.sh
-[ -f "$RES/eqlcompanion.sh" ] && . "$RES/eqlcompanion.sh"   # EQ Legends Companion
 
 eqbuddy_offer(){
     local choice setup eqlog="$OSXEQL_HOME/logs/eqbuddy-install.log"
@@ -441,33 +440,6 @@ OSA
     command -v eqbuddy_mark_installed >/dev/null 2>&1 && eqbuddy_mark_installed "$setup"
     osa -e 'display notification "Installing EQBuddy Evolved — it opens when ready." with title "osxEQL"' &
     EQBUDDY_JUST_INSTALLED=1
-}
-
-# ---- EQ Legends Companion (optional; see Resources/eqlcompanion.sh) ---------
-# Asked once, like EQBuddy. Installing happens in the background on this launch
-# (eqlc_update_and_launch installs a missing app), so the game never waits.
-eqlc_offer(){
-    local choice
-    choice=$(osa <<'OSA'
-set msg to "osxEQL-Buddy can also run EQ Legends Companion — a DPS meter with floating overlays, Plane of Sky tracker, loot & item knowledge, buff timers and voice alerts — together with the game." & return & return & "It is downloaded from its official GitHub release (jmoyers/everquest-companion), checked against its published SHA-512, and installed into the game's Wine prefix. It is a separate project by its own author, not part of osxEQL-Buddy." & return & return & "You can run it alongside EQBuddy, or instead of it. Change this any time: hold Option (⌥) while opening the app."
-set r to display dialog msg buttons {"No thanks", "Install EQ Legends Companion"} default button "Install EQ Legends Companion" with title "osxEQL-Buddy — EQ Legends Companion" with icon note
-return button returned of r
-OSA
-)
-    case "$choice" in
-        "Install EQ Legends Companion")
-            eqlc_set_mode window
-            osa -e 'display notification "Installing EQ Legends Companion — it opens when ready." with title "osxEQL-Buddy"' & ;;
-        "No thanks") eqlc_set_mode off ;;
-        *) : ;;   # dismissed: ask again next launch
-    esac
-}
-
-start_eqlc(){
-    command -v eqlc_mode >/dev/null 2>&1 || return 0
-    [ "$(eqlc_mode)" = unset ] && eqlc_offer
-    echo "==== $(date) ====" >> "$OSXEQL_HOME/logs/eqlc.log"
-    eqlc_update_and_launch "$OSXEQL_HOME/logs/eqlc.log"
 }
 
 start_eqbuddy(){
@@ -510,13 +482,13 @@ collect_diagnostics(){
         /usr/bin/sw_vers
         /usr/sbin/sysctl -n hw.model machdep.cpu.brand_string hw.memsize
         echo "game window: ${OSXEQL_W}x${OSXEQL_H}"
-        for f in eqbuddy eqbuddy-autohide eqbuddy-autoclose eqbuddy-autoupdate eqbuddy-helper eqlc eqlc-autoupdate eqlc-installed-version resolution eqbuddy-installed.sha256; do
+        for f in eqbuddy eqbuddy-autohide eqbuddy-autoclose eqbuddy-autoupdate eqbuddy-helper resolution eqbuddy-installed.sha256; do
             echo "$f: $(cat "$OSXEQL_HOME/$f" 2>/dev/null || echo '(default)')"
         done
         for so in winemac.so.osxeql-overlay winecoreaudio.so.osxeql-audiofix; do
             [ -f "$WINE_DIR/lib/wine/x86_64-unix/$so" ] && echo "patched: $so" || echo "not patched: $so"
         done
-        echo "--- processes"; /bin/ps -axo pid,rss,%cpu,command | grep -iE 'eqgame|eqbuddy|companion|LaunchPad|wineserver' | grep -v grep
+        echo "--- processes"; /bin/ps -axo pid,rss,%cpu,command | grep -iE 'eqgame|eqbuddy|LaunchPad|wineserver' | grep -v grep
     } > "$tmp/summary.txt" 2>&1
     cp -R "$OSXEQL_HOME/logs" "$tmp/logs" 2>/dev/null
     cp "$WINEPREFIX"/drive_c/users/*/AppData/Roaming/"EQBuddy Evolved"/error.log "$tmp/eqbuddy-error.log" 2>/dev/null
@@ -581,12 +553,10 @@ settings_menu(){
         largest="$(gamelog_list 0 | while IFS= read -r i; do gamelog_mb "$i"; done | sort -n | tail -1)"
         items=(
             "EQBuddy: $(case "$mode" in (window|desktop) echo ON ;; (*) echo OFF ;; esac)"
-            "EQ Legends Companion: $( [ "$(_flag eqlc unset)" = window ] && echo ON || echo OFF)"
-            "Hide companions when another app is in front: $(_onoff "$(_flag eqbuddy-autohide on)")"
-            "Close companions with the game: $(_onoff "$(_flag eqbuddy-autoclose on)")"
+            "Hide EQBuddy when another app is in front: $(_onoff "$(_flag eqbuddy-autohide on)")"
+            "Close EQBuddy with the game: $(_onoff "$(_flag eqbuddy-autoclose on)")"
             "Update EQBuddy automatically: $(_onoff "$(_flag eqbuddy-autoupdate on)")"
-            "Update EQ Legends Companion automatically: $(_onoff "$(_flag eqlc-autoupdate on)")"
-            "Companion helper (EQBuddy sounds, hide, close): $(_onoff "$(_flag eqbuddy-helper on)")"
+            "EQBuddy helper (alert sounds, hide, close): $(_onoff "$(_flag eqbuddy-helper on)")"
             "Archive game logs (largest: ${largest:-0} MB)"
             "Warn me when a game log is over $(gamelog_threshold_mb) MB: $(_onoff "$(_flag log-check on)")"
             "Collect diagnostics (zip on the Desktop)"
@@ -594,18 +564,15 @@ settings_menu(){
             "Quit without playing"
         )
         list=""; for i in "${items[@]}"; do list="$list${list:+, }\"$i\""; done
-        choice="$(osa -e "choose from list {$list} with title \"osxEQL-Buddy\" with prompt \"Settings & troubleshooting. Pick a line to change it — Play starts the game. (Stutters? First archive big game logs; then try the companions OFF, then ON with the helper OFF.)\" OK button name \"Change\" cancel button name \"Play\"")"
+        choice="$(osa -e "choose from list {$list} with title \"osxEQL-Buddy\" with prompt \"Settings & troubleshooting. Pick a line to change it — Play starts the game. (Stutters? Try the game with EQBuddy OFF, then EQBuddy ON with its helper OFF.)\" OK button name \"Change\" cancel button name \"Play\"")"
         case "$choice" in
             ""|false)        return 0 ;;
             "EQBuddy: ON")   eqbuddy_set_mode off ;;
             "EQBuddy: OFF")  eqbuddy_set_mode window ;;   # installed on launch if missing
-            "EQ Legends Companion: ON")  eqlc_set_mode off ;;
-            "EQ Legends Companion: OFF") eqlc_set_mode window ;;   # installed on launch if missing
             Hide*)           _toggle eqbuddy-autohide ;;
             Close*)          _toggle eqbuddy-autoclose ;;
-            "Update EQBuddy"*) _toggle eqbuddy-autoupdate ;;
-            "Update EQ Legends"*) _toggle eqlc-autoupdate ;;
-            "Companion helper"*) _toggle eqbuddy-helper ;;
+            Update*)         _toggle eqbuddy-autoupdate ;;
+            "EQBuddy helper"*) _toggle eqbuddy-helper ;;
             "Archive game logs"*) archive_game_logs_dialog 1 ;;   # every log over 1 MB
             Warn*)           _toggle log-check ;;
             Collect*)        collect_diagnostics ;;
@@ -633,6 +600,5 @@ cd "$GAME_DIR" 2>/dev/null || cd "$WINEPREFIX/drive_c"
 command -v eqbuddy_set_mode >/dev/null 2>&1 && option_held && settings_menu
 check_big_game_logs
 start_eqbuddy
-start_eqlc
 # LaunchPad in a wine virtual desktop (avoids its splash-window deadlock).
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" "$LP_WINPATH" >"$LOG" 2>&1

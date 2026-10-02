@@ -18,8 +18,7 @@
 //
 // Third job — close EQBuddy with the game (see "Auto-close" in update()).
 //
-// Usage: eqbuddy-focus --prefix <WINEPREFIX> [--app <needle>]... [--sounds on|off]
-//                      [--autohide on|off] [--autoclose on|off]
+// Usage: eqbuddy-focus --prefix <WINEPREFIX> [--autohide on|off] [--autoclose on|off]
 // Started by engine/eqbuddy.sh next to EQBuddy. Built by packaging/build-app.sh into
 // the .app, or on first use by the engine.
 import AppKit
@@ -30,23 +29,6 @@ func option(_ name: String) -> String? {
     return cliArgs[i + 1]
 }
 let autohide = (option("--autohide") ?? "on") != "off"
-/// The companion app(s) this helper looks after: every `--app <needle>` (matched, lower
-/// case, against a process's name + argv). Default: EQBuddy. One helper per companion —
-/// EQ Legends Companion runs its own with --app "eq legends companion" --sounds off.
-let targets: [String] = {
-    var out: [String] = []
-    var i = 1
-    while i < cliArgs.count {
-        if cliArgs[i] == "--app", i + 1 < cliArgs.count { out.append(cliArgs[i + 1].lowercased()); i += 1 }
-        i += 1
-    }
-    return out.isEmpty ? ["eqbuddy.exe"] : out
-}()
-/// Alert-sound bridge (EQBuddy only: its WPF player can't play under this Wine).
-let soundsOn = (option("--sounds") ?? "on") != "off"
-/// Every companion counts as "game side": switching from the game to one of them must
-/// not hide the other.
-let knownCompanions = ["eqbuddy.exe", "eq legends companion", "everquest-companion"]
 let autoclose = (option("--autoclose") ?? "on") != "off"
 let prefix = option("--prefix")
 
@@ -76,8 +58,7 @@ func running(_ needle: String, in apps: [NSRunningApplication]? = nil) -> [NSRun
 }
 
 func isGameSide(_ s: String) -> Bool {
-    s.contains("eqgame.exe") || s.contains("/desktop=osxeql")
-        || knownCompanions.contains(where: { s.contains($0) }) || targets.contains(where: { s.contains($0) })
+    s.contains("eqgame.exe") || s.contains("eqbuddy.exe") || s.contains("/desktop=osxeql")
 }
 
 /// One line per decision, to logs/eqbuddy.log (stdout is redirected there).
@@ -100,7 +81,7 @@ let closeGrace: TimeInterval = 20
 
 func update(front: NSRunningApplication?) {
     let apps = NSWorkspace.shared.runningApplications
-    let buddies = apps.filter { a in let id = ident(a); return targets.contains(where: { id.contains($0) }) }
+    let buddies = running("eqbuddy.exe", in: apps)
     if buddies.isEmpty {
         // Give EQBuddy time to start; after that, no EQBuddy = nothing left to do.
         if sawBuddy || Date().timeIntervalSince(started) > 120 {
@@ -313,7 +294,7 @@ func footprintMB(_ pid: pid_t) -> Int {
 func logMemory() {
     let apps = NSWorkspace.shared.runningApplications
     var parts = ["helper \(footprintMB(getpid())) MB"]
-    for (label, needle) in targets.map({ ($0, $0) }) + [("eqgame", "eqgame.exe")] {
+    for (label, needle) in [("EQBuddy", "eqbuddy.exe"), ("eqgame", "eqgame.exe")] {
         for a in running(needle, in: apps) { parts.append("\(label) \(footprintMB(a.processIdentifier)) MB") }
     }
     note("memory: " + parts.joined(separator: ", "))
@@ -353,14 +334,12 @@ func armWatchers() {
     }
 }
 
-if soundsOn {
-    autoreleasepool { pollErrorLogs(); armWatchers() }   // sets the start offsets, then watches
-    Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in autoreleasepool { armWatchers(); pollErrorLogs() } }
-}
+autoreleasepool { pollErrorLogs(); armWatchers() }   // sets the start offsets, then watches
+Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in autoreleasepool { armWatchers(); pollErrorLogs() } }
 
 wakeAfter(121)   // EQBuddy never showed up within the startup grace -> exit
 Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in autoreleasepool { logMemory() } }
 Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { _ in autoreleasepool { logMemory() } }
-note("started (pid \(getpid()), apps \(targets), sounds \(soundsOn ? "on" : "off"), autohide \(autohide ? "on" : "off"), autoclose \(autoclose ? "on" : "off"), prefix \(prefix ?? "-"))")
+note("started (pid \(getpid()), autohide \(autohide ? "on" : "off"), autoclose \(autoclose ? "on" : "off"), prefix \(prefix ?? "-"))")
 autoreleasepool { update(front: nil) }
 RunLoop.main.run()

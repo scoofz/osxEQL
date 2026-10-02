@@ -10,8 +10,7 @@ projects together on the Mac and fixes what got in the way of playing with both:
 |---|---|---|
 | **osxEQL** | Runs the Windows game on macOS with open-source parts only: Wine built from CodeWeavers' published source + DXMT (DirectX 11 → Metal). No CrossOver, no proprietary D3DMetal. | [sowoky/osxEQL](https://github.com/sowoky/osxEQL) (MIT) — the base of this repo |
 | **EQBuddy Evolved** | An always-on-top widget that reads your EverQuest `/log` live: kills, DPS, loot, timers, buffs, quests, alerts… Windows-only. | [DranakCorps-bot/EQBuddy](https://github.com/DranakCorps-bot/EQBuddy) (proprietary — downloaded from its official release, never bundled) |
-| **EQ Legends Companion** | A DPS meter with floating overlays, Plane of Sky tracker, loot & item knowledge, AA/levels, raid targets, buff timers, sound and voice alerts — also from your `/log`. Windows-only (Electron). | [jmoyers/everquest-companion](https://github.com/jmoyers/everquest-companion) (FSL-1.1-MIT — downloaded from its official release, never bundled) |
-| **osxEQL-Buddy** | Installs, updates and runs EQBuddy and/or EQ Legends Companion *inside* osxEQL's Wine, makes it float over the fullscreen game, hide/close with it, play its sounds — and fixes osxEQL's fullscreen/mouse and Bluetooth-audio issues along the way. | This fork |
+| **osxEQL-Buddy** | Installs, updates and runs EQBuddy *inside* osxEQL's Wine, makes it float over the fullscreen game, hide/close with it, play its sounds — and fixes osxEQL's fullscreen/mouse and Bluetooth-audio issues along the way. | This fork |
 
 > Unofficial, fan-made compatibility tool. **Not** affiliated with or endorsed by
 > Daybreak Game Company, Game Jawn, CodeWeavers, Apple, or the EQBuddy author. The
@@ -58,7 +57,6 @@ a Daybreak / EverQuest Legends account and the official **`EQLegends_setup.exe`*
    game — a chime tells you when the login screen is ready. Log in, hit **Play**.
 5. On the next launch osxEQL asks **once** whether to install **EQBuddy Evolved**. Say yes:
    from then on it opens with the game, stays up to date, and closes with it.
-   It then asks the same about **EQ Legends Companion** — take one, the other, or both.
 
 **Settings & troubleshooting, no Terminal needed:** hold **⌥ Option** while opening
 osxEQL-Buddy. A small list lets you switch EQBuddy and each of its extras on or off, **archive your
@@ -130,16 +128,6 @@ EQBuddy Evolved is **Windows-only** and **proprietary** (© David Edwards). Its 
 line, which had native Linux/macOS builds, is MIT-licensed; a few small pieces of 1.x are
 reused here (see [License & credits](#license--credits)).
 
-### And EQ Legends Companion
-
-[EQ Legends Companion](https://github.com/jmoyers/everquest-companion) (Josh Moyers) reads
-the same log for a **live DPS meter** with fight history, **floating overlays** (damage or
-healing, per fight or per zone, click-through when locked), a **Plane of Sky tracker**,
-**loot and item knowledge** (what each item is for), **leveling & AA** history, **raid
-targets**, **buff timers** and **sound/voice alerts** with ~350 installable voice packs. It
-is a Windows Electron app (FSL-1.1-MIT) that already knows how to paint inside a Wine
-prefix. osxEQL-Buddy runs it the same way as EQBuddy — alongside it or instead of it.
-
 ## How the two run together
 
 ```
@@ -200,17 +188,6 @@ device are unchanged; `OSXEQL_PIN_AUDIO_DEVICE=1` restores the old behaviour.
 | **Alert sounds** | EQBuddy plays alerts through WPF's media player, which can't play anything under this Wine (its WAV parser needs GStreamer, which the runtime doesn't ship) — every alert logged `0x80040218`. The helper watches EQBuddy's `error.log` and plays the sound with `afplay`, using the macOS sounds EQBuddy 1.x used natively (Ding→Ping, Notify→Glass, Chimes→Blow, Chord→Pop, Tada→Hero, Exclamation→Sosumi, Alarm→Submarine) at EQBuddy's alert volume; custom `.wav`/`.mp3` files in the prefix play as is. |
 | **Closes with the game** | 20 s after the game closes (enough for a quick relaunch from LaunchPad), the helper sends EQBuddy a normal macOS Quit, which it handles as a Windows shutdown — it saves and exits cleanly (forced only if it ignores that for 30 s). An EQBuddy you opened without the game is left alone. |
 
-### 3b. EQ Legends Companion, integrated the same way
-
-| Feature | How it works |
-|---|---|
-| **Install** | Reads the project's `latest.yml` from its GitHub release, downloads the installer it names, **refuses it unless it matches the published SHA-512**, and runs the one-click installer silently (`/S`) into the game's prefix. The app's own log discovery already looks at `C:\Users\Public\Daybreak Game Company\…\EverQuest Legends`, which is where the game writes in our prefix — no setup. |
-| **Starts with the game** | Next to LaunchPad on every Play, as its own Mac window(s). |
-| **Always up to date** | `latest.yml`'s version vs. the installed one at every launch, in the background. (The app's built-in updater verifies installers through PowerShell, which Wine doesn't have — this replaces it.) |
-| **Overlays over fullscreen** | The same patched `winemac.so` knob as EQBuddy, written for its exe before it starts. |
-| **Hides / closes with the game** | The same macOS helper, run for this app (`--app "eq legends companion"`), sharing EQBuddy's *hide* and *close* settings. |
-| **Sounds & voice** | Nothing to do: Electron plays its own audio through Wine's CoreAudio driver (no GStreamer involved), and the headphone fix applies to it too. |
-
 ### 4. Tooling
 - `osxeql overlay` / `osxeql audiofix` rebuild **only** the patched driver (`winemac.so` /
   `winecoreaudio.so`) from the same CrossOver source in a few minutes, with a backup and
@@ -241,10 +218,6 @@ engine/osxeql eqbuddy window|desktop|off
 engine/osxeql eqbuddy autohide on|off   # hide EQBuddy while another app is in front
 engine/osxeql eqbuddy autoclose on|off  # quit EQBuddy 20 s after the game closes
 engine/osxeql eqbuddy autoupdate on|off # update EQBuddy at every launch
-engine/osxeql eqlc                      # EQ Legends Companion: install state, version, latest
-engine/osxeql eqlc install|update       # install / update it now (SHA-512 checked)
-engine/osxeql eqlc window|off           # start it with the game, or not
-engine/osxeql eqlc autoupdate on|off    # update it at every launch (default on)
 engine/osxeql eqbuddy helper on|off     # diagnostic: off = no eqbuddy-focus helper at all
                                         # (no autohide, alert sounds or autoclose)
 
@@ -271,7 +244,6 @@ All in `~/Library/Application Support/osxEQL/logs/`:
 | `app-launch.log`, `launch-*.log` | the game / LaunchPad |
 | `eqbuddy.log` | EQBuddy update check and start, helper decisions (show/hide/close), each alert sound played, memory lines |
 | `eqbuddy-install.log` | first EQBuddy install from the app |
-| `eqlc.log` | EQ Legends Companion: update check, install, start, its helper's decisions |
 | `overlay-*.log`, `audiofix-build.log` | driver rebuilds |
 
 EQBuddy's own errors: `…/osxEQL/prefix/drive_c/users/<you>/AppData/Roaming/EQBuddy Evolved/error.log`.
