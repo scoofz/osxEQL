@@ -59,7 +59,8 @@ a Daybreak / EverQuest Legends account and the official **`EQLegends_setup.exe`*
    from then on it opens with the game, stays up to date, and closes with it.
 
 **Settings & troubleshooting, no Terminal needed:** hold **⌥ Option** while opening
-osxEQL-Buddy. A small list lets you switch EQBuddy and each of its extras on or off, and
+osxEQL-Buddy. A small list lets you switch EQBuddy and each of its extras on or off, **archive your
+EverQuest logs** (huge logs cause freezes — the app also warns you at launch), and
 **Collect diagnostics** puts a zip on your Desktop (logs, settings, Mac model — no
 passwords) to attach to a bug report. Press **Play** to start the game.
 
@@ -224,6 +225,7 @@ engine/osxeql overlay  [--status|--revert]   # winemac.so float-over-fullscreen 
 engine/osxeql audiofix [--status|--revert]   # winecoreaudio.so follow-default-output patch
                                              # (only for a self-built runtime: the release
                                              #  app has both; needs Xcode CLT + brew bison)
+engine/osxeql logs [archive [MB]]            # EverQuest logs + sizes; archive big ones
 engine/osxeql winlevels [filter] [--delay N] # on-screen windows + macOS window levels
 ```
 
@@ -264,6 +266,9 @@ EQBuddy's own errors: `…/osxEQL/prefix/drive_c/users/<you>/AppData/Roaming/EQB
   it's huge too). EverQuest starts a fresh one next time you `/log`. EQBuddy keeps its
   own session history, so nothing is lost there. Want to keep the old one? Move it to
   your Desktop instead of deleting it.
+  **The app does this for you:** at launch it warns when a log is over 100 MB and offers
+  to **Archive** it (moved to `Logs/archive/` with a date, never deleted); the ⌥ Option
+  menu has **Archive game logs** any time. CLI: `osxeql logs`, `osxeql logs archive`.
 - **Micro-stutters in game** (log is small) → hold ⌥ Option while opening the app and try one session
   with *EQBuddy: OFF*, then one with EQBuddy ON and *EQBuddy helper: OFF*. From the CLI,
   the same bisect: play once with `osxeql eqbuddy off` (no EQBuddy),

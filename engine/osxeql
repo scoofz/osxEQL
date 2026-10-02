@@ -38,6 +38,9 @@ osxEQL — run EverQuest Legends on Apple Silicon with open-source parts only.
                                Rebuild winecoreaudio.so so the game's sound follows
                                the macOS output (headphones die -> speakers at their
                                volume; new headphones -> them) without a restart.
+  osxeql logs [archive [MB]]   EverQuest's own logs and their sizes; archive = move
+                               those over MB (default: all) to Logs/archive/. Huge
+                               logs make the game and EQBuddy stutter.
   osxeql winlevels [filter] [--delay N]
                                List on-screen windows with their macOS window
                                LEVEL (diagnoses overlay z-order). --delay waits N s
@@ -207,6 +210,15 @@ case "${1:-}" in
     overlay)       shift; bash "$HERE/overlay.sh" "$@" ;;
     audiofix)      shift; bash "$HERE/audiofix.sh" "$@" ;;
     winlevels)     shift; cmd_winlevels "$@" ;;
+    logs)
+        shift
+        case "${1:-}" in
+            "")      echo "EverQuest logs in $(gamelog_dir) (startup warning above $(gamelog_threshold_mb) MB):"
+                     gamelog_list 0 | gamelog_describe | sed 's/^/  /' ;;
+            archive) moved="$(gamelog_list "${2:-0}" | gamelog_archive)" || die "quit the game first"
+                     log "archived ${moved:-0} MB to $(gamelog_dir)/archive" ;;
+            *)       die "usage: osxeql logs [archive [MB]]" ;;
+        esac ;;
     status)        cmd_status ;;
     doctor)        cmd_doctor ;;
     ""|-h|--help)  usage ;;

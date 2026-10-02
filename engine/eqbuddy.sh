@@ -356,3 +356,66 @@ for p in sys.argv[1:]:
     print("EQBuddy: normalised", os.path.basename(p), "to canonical PCM WAV")
 PY
 }
+
+# ---- EverQuest's own log files ------------------------------------------------
+# With /log on, EverQuest appends every chat/combat line to
+# Logs/eqlog_<character>_<server>.txt forever. Past a few hundred MB, the game — and
+# EQBuddy, which tails the file live — hitch on writes: the freezes a player reported
+# (2026-10). "Archiving" moves a log into Logs/archive/ with a date stamp; EverQuest
+# starts a fresh file on the next /log, and EQBuddy (which only reads Logs/eqlog_*.txt
+# directly) picks the new one up. Nothing is deleted: the player decides what to do
+# with the archive folder. Never done while the game is running.
+GAMELOG_THRESHOLD_FILE="$OSXEQL_HOME/log-threshold-mb"   # default 100
+GAMELOG_CHECK_FILE="$OSXEQL_HOME/log-check"              # on|off (startup prompt)
+
+gamelog_dir() {
+    printf '%s\n' "$WINEPREFIX/drive_c/users/Public/Daybreak Game Company/Installed Games/EverQuest Legends/Logs"
+}
+
+gamelog_threshold_mb() {
+    local t
+    t="$( [ -f "$GAMELOG_THRESHOLD_FILE" ] && tr -cd '0-9' < "$GAMELOG_THRESHOLD_FILE")"
+    printf '%s\n' "${t:-100}"
+}
+
+# Size in MB, rounded. wc -c on a regular file is an fstat (instant), and unlike stat
+# it means the same thing on macOS and Linux.
+gamelog_mb() {
+    local b
+    b="$(wc -c < "$1" 2>/dev/null | tr -cd '0-9')"
+    echo $(( ( ${b:-0} + 524288 ) / 1048576 ))
+}
+
+# The game's logs (eqlog_*.txt + dbg.txt), one per line; $1 = minimum size in MB (0 = all).
+gamelog_list() {
+    local min="${1:-0}" d f
+    d="$(gamelog_dir)"
+    [ -d "$d" ] || return 0
+    for f in "$d"/eqlog_*.txt "$d/dbg.txt"; do
+        [ -f "$f" ] || continue
+        [ "$(gamelog_mb "$f")" -ge "$min" ] && printf '%s\n' "$f"
+    done
+}
+
+# "eqlog_Bob_server.txt (412 MB)" lines for a dialog; reads paths on stdin.
+gamelog_describe() {
+    local f
+    while IFS= read -r f; do printf '%s (%s MB)\n' "$(basename "$f")" "$(gamelog_mb "$f")"; done
+}
+
+gamelog_game_running() { pgrep -qf 'eqgame\.exe' 2>/dev/null; }
+
+# Move the given logs (paths on stdin) into Logs/archive/<name>-<date>.txt.
+# Prints the total MB moved. Refuses while the game runs.
+gamelog_archive() {
+    local d arch f stamp total=0
+    gamelog_game_running && { echo "game running — not archiving" >&2; return 1; }
+    d="$(gamelog_dir)"; arch="$d/archive"; stamp="$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$arch" || return 1
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue
+        total=$(( total + $(gamelog_mb "$f") ))
+        mv -f "$f" "$arch/$(basename "${f%.txt}")-$stamp.txt" || return 1
+    done
+    printf '%s\n' "$total"
+}

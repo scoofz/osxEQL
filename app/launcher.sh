@@ -502,16 +502,63 @@ collect_diagnostics(){
     rm -rf "$(dirname "$tmp")"
 }
 
+# ---- oversized EverQuest logs (see gamelog_* in Resources/eqbuddy.sh) -------------
+# $1 = minimum size in MB ("" = the threshold). Lists the logs, asks, archives.
+# Returns 0 when it archived something.
+archive_game_logs_dialog(){
+    local min="${1:-$(gamelog_threshold_mb)}" files desc msg btn moved
+    if gamelog_game_running; then
+        alert "Quit EverQuest first — its logs can't be archived while the game is running."; return 1
+    fi
+    files="$(gamelog_list "$min")"
+    if [ -z "$files" ]; then
+        osa -e "display alert \"osxEQL-Buddy\" message \"No game log to archive (none over $min MB).\""; return 1
+    fi
+    desc="$(printf '%s\n' "$files" | gamelog_describe | awk '{printf "%s\\n", $0}')"
+    msg="These EverQuest logs will be moved to the Logs/archive folder (nothing is deleted):\n\n${desc}\nEverQuest starts a fresh log the next time you /log. EQBuddy keeps its own history."
+    btn="$(osa -e "button returned of (display dialog \"$msg\" with title \"osxEQL-Buddy\" buttons {\"Cancel\", \"Archive\"} default button \"Archive\" cancel button \"Cancel\")")"
+    [ "$btn" = Archive ] || return 1
+    if moved="$(printf '%s\n' "$files" | gamelog_archive)"; then
+        btn="$(osa -e "button returned of (display dialog \"Done — $moved MB moved to Logs/archive. You can delete that folder whenever you like.\" with title \"osxEQL-Buddy\" buttons {\"Show archive\", \"OK\"} default button \"OK\")")"
+        [ "$btn" = "Show archive" ] && open "$(gamelog_dir)/archive"
+        return 0
+    fi
+    alert "Could not archive the logs (see the Logs folder)."; return 1
+}
+
+# Once per launch: a log over the threshold slows the game down — offer to archive it.
+check_big_game_logs(){
+    local files desc btn
+    command -v gamelog_list >/dev/null 2>&1 || return 0
+    [ "$(_flag log-check on)" = off ] && return 0
+    gamelog_game_running && return 0
+    files="$(gamelog_list "$(gamelog_threshold_mb)")"
+    [ -n "$files" ] || return 0
+    desc="$(printf '%s\n' "$files" | gamelog_describe | awk '{printf "%s\\n", $0}')"
+    btn="$(osa -e "button returned of (display dialog \"Your EverQuest log is getting big:\n\n${desc}\nVery large logs make the game (and EQBuddy) stutter and freeze. Archive it now? It is moved, not deleted.\" with title \"osxEQL-Buddy\" buttons {\"Never ask\", \"Not now\", \"Archive\"} default button \"Archive\" with icon caution)")"
+    case "$btn" in
+        Archive)
+            if printf '%s\n' "$files" | gamelog_archive >/dev/null; then
+                osa -e 'display notification "Game log archived (Logs/archive)." with title "osxEQL-Buddy"' &
+            fi ;;
+        "Never ask") echo off > "$OSXEQL_HOME/log-check" ;;
+    esac
+    return 0
+}
+
 settings_menu(){
-    local choice mode list i items
+    local choice mode list i items largest
     while :; do
         mode="$(_flag eqbuddy unset)"
+        largest="$(gamelog_list 0 | while IFS= read -r i; do gamelog_mb "$i"; done | sort -n | tail -1)"
         items=(
             "EQBuddy: $(case "$mode" in (window|desktop) echo ON ;; (*) echo OFF ;; esac)"
             "Hide EQBuddy when another app is in front: $(_onoff "$(_flag eqbuddy-autohide on)")"
             "Close EQBuddy with the game: $(_onoff "$(_flag eqbuddy-autoclose on)")"
             "Update EQBuddy automatically: $(_onoff "$(_flag eqbuddy-autoupdate on)")"
             "EQBuddy helper (alert sounds, hide, close): $(_onoff "$(_flag eqbuddy-helper on)")"
+            "Archive game logs (largest: ${largest:-0} MB)"
+            "Warn me when a game log is over $(gamelog_threshold_mb) MB: $(_onoff "$(_flag log-check on)")"
             "Collect diagnostics (zip on the Desktop)"
             "Open the logs folder"
             "Quit without playing"
@@ -526,6 +573,8 @@ settings_menu(){
             Close*)          _toggle eqbuddy-autoclose ;;
             Update*)         _toggle eqbuddy-autoupdate ;;
             "EQBuddy helper"*) _toggle eqbuddy-helper ;;
+            "Archive game logs"*) archive_game_logs_dialog 1 ;;   # every log over 1 MB
+            Warn*)           _toggle log-check ;;
             Collect*)        collect_diagnostics ;;
             Open*)           open "$OSXEQL_HOME/logs" ;;
             Quit*)           exit 0 ;;
@@ -549,6 +598,7 @@ else
 fi
 cd "$GAME_DIR" 2>/dev/null || cd "$WINEPREFIX/drive_c"
 command -v eqbuddy_set_mode >/dev/null 2>&1 && option_held && settings_menu
+check_big_game_logs
 start_eqbuddy
 # LaunchPad in a wine virtual desktop (avoids its splash-window deadlock).
 exec "$WINE" explorer "/desktop=osxEQL,${OSXEQL_W}x${OSXEQL_H}" "$LP_WINPATH" >"$LOG" 2>&1
